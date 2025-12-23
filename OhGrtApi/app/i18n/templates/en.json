@@ -1,0 +1,83 @@
+{
+  "horoscope": {
+    "intro": "Here is your {sign} horoscope",
+    "daily": "Daily Horoscope for {sign}",
+    "weekly": "Weekly Horoscope for {sign}",
+    "monthly": "Monthly Horoscope for {sign}",
+    "lucky_number": "Lucky Number",
+    "lucky_color": "Lucky Color",
+    "advice": "Advice"
+  },
+  "birth_chart": {
+    "title": "Birth Chart (Kundli)",
+    "ascendant": "Ascendant (Lagna)",
+    "sun_sign": "Sun Sign",
+    "moon_sign": "Moon Sign",
+    "nakshatra": "Nakshatra",
+    "enter_details": "Please enter your birth details"
+  },
+  "panchang": {
+    "title": "Today's Panchang",
+    "tithi": "Tithi",
+    "nakshatra": "Nakshatra",
+    "yoga": "Yoga",
+    "karana": "Karana",
+    "paksha": "Paksha",
+    "sunrise": "Sunrise",
+    "sunset": "Sunset",
+    "rahu_kaal": "Rahu Kaal"
+  },
+  "numerology": {
+    "title": "Numerology Analysis",
+    "life_path": "Life Path Number",
+    "destiny": "Destiny Number",
+    "soul_urge": "Soul Urge Number",
+    "lucky_numbers": "Lucky Numbers"
+  },
+  "tarot": {
+    "title": "Tarot Reading",
+    "question": "Question",
+    "overall": "Overall Interpretation"
+  },
+  "weather": {
+    "title": "Weather",
+    "temperature": "Temperature",
+    "humidity": "Humidity",
+    "condition": "Condition",
+    "enter_city": "Please specify a city"
+  },
+  "pnr": {
+    "title": "PNR Status",
+    "train": "Train",
+    "from": "From",
+    "to": "To",
+    "date": "Date",
+    "class": "Class",
+    "chart_prepared": "Chart Prepared",
+    "passenger_status": "Passenger Status",
+    "booking_status": "Booking Status",
+    "current_status": "Current Status"
+  },
+  "news": {
+    "title": "News Headlines",
+    "no_articles": "No news articles found",
+    "source": "Source"
+  },
+  "image": {
+    "title": "Image Generation",
+    "generated": "Image Generated",
+    "enter_prompt": "What image would you like me to generate?"
+  },
+  "errors": {
+    "general": "An error occurred. Please try again.",
+    "service_unavailable": "This service is temporarily unavailable.",
+    "invalid_input": "Please check your input and try again."
+  },
+  "common": {
+    "yes": "Yes",
+    "no": "No",
+    "example": "Example",
+    "tips": "Tips",
+    "try_again": "Please try again"
+  }
+}

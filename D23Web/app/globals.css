@@ -1,0 +1,227 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --background: #05030b;
+  --foreground: #f5f4ff;
+  --card: #0f031c;
+  --card-foreground: #f5f4ff;
+  --popover: #0f031c;
+  --popover-foreground: #f5f4ff;
+  --primary: #d946ef;
+  --primary-foreground: #110012;
+  --secondary: #251035;
+  --secondary-foreground: #f5f4ff;
+  --muted: #2d1a44;
+  --muted-foreground: #bba9d8;
+  --accent: #2b0f46;
+  --accent-foreground: #f5f4ff;
+  --destructive: #f97066;
+  --destructive-foreground: #14000f;
+  --border: #2f1246;
+  --input: #2f1246;
+  --ring: #d946ef;
+  --brand: #d946ef;
+  --chart-1: oklch(0.55 0.29 326.38);
+  --chart-2: oklch(0.63 0.21 296.72);
+  --chart-3: oklch(0.58 0.18 344.21);
+  --chart-4: oklch(0.59 0.19 18.56);
+  --chart-5: oklch(0.64 0.2 80.14);
+  --radius: 0.625rem;
+  --sidebar: #05030b;
+  --sidebar-foreground: #f5f4ff;
+  --sidebar-primary: #d946ef;
+  --sidebar-primary-foreground: #1c0012;
+  --sidebar-accent: #12011c;
+  --sidebar-accent-foreground: #f5f4ff;
+  --sidebar-border: #2f1246;
+  --sidebar-ring: #d946ef;
+}
+
+.dark {
+  --background: #05030b;
+  --foreground: #f5f4ff;
+  --card: #0f031c;
+  --card-foreground: #f5f4ff;
+  --popover: #0f031c;
+  --popover-foreground: #f5f4ff;
+  --primary: #d946ef;
+  --primary-foreground: #110012;
+  --secondary: #251035;
+  --secondary-foreground: #f5f4ff;
+  --muted: #2d1a44;
+  --muted-foreground: #bba9d8;
+  --accent: #2b0f46;
+  --accent-foreground: #f5f4ff;
+  --destructive: #f97066;
+  --destructive-foreground: #14000f;
+  --border: #2f1246;
+  --input: #2f1246;
+  --ring: #d946ef;
+  --brand: #d946ef;
+  --chart-1: oklch(0.55 0.29 326.38);
+  --chart-2: oklch(0.63 0.21 296.72);
+  --chart-3: oklch(0.58 0.18 344.21);
+  --chart-4: oklch(0.59 0.19 18.56);
+  --chart-5: oklch(0.64 0.2 80.14);
+  --sidebar: #05030b;
+  --sidebar-foreground: #f5f4ff;
+  --sidebar-primary: #d946ef;
+  --sidebar-primary-foreground: #1c0012;
+  --sidebar-accent: #12011c;
+  --sidebar-accent-foreground: #f5f4ff;
+  --sidebar-border: #2f1246;
+  --sidebar-ring: #d946ef;
+}
+
+@theme inline {
+  --font-sans: "Geist", "Geist Fallback";
+  --font-mono: "Geist Mono", "Geist Mono Fallback";
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-brand: var(--brand);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    background-color: #05030b;
+    background-image:
+      radial-gradient(circle at 25% 20%, rgba(217, 70, 239, 0.25), transparent 55%),
+      radial-gradient(circle at 80% 0%, rgba(99, 102, 241, 0.25), transparent 45%),
+      linear-gradient(180deg, rgba(5, 3, 11, 0.9), rgba(5, 3, 11, 0.95)),
+      repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.02) 1px, transparent 1px, transparent 40px),
+      repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.02) 1px, transparent 1px, transparent 40px);
+    background-size: 100% 100%, 100% 100%, 100% 100%, 40px 40px, 40px 40px;
+    background-blend-mode: screen, screen, normal, normal, normal;
+  }
+}
+
+@keyframes floaty {
+  0% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+@keyframes glowPulse {
+  0% {
+    box-shadow: 0 20px 50px -24px rgba(12, 164, 112, 0.45);
+    outline-color: rgba(12, 164, 112, 0.3);
+  }
+  50% {
+    box-shadow: 0 26px 60px -20px rgba(12, 164, 112, 0.6);
+    outline-color: rgba(12, 164, 112, 0.5);
+  }
+  100% {
+    box-shadow: 0 20px 50px -24px rgba(12, 164, 112, 0.45);
+    outline-color: rgba(12, 164, 112, 0.3);
+  }
+}
+
+.animate-floaty {
+  animation: floaty 6s ease-in-out infinite;
+}
+
+.animate-glow {
+  animation: glowPulse 5s ease-in-out infinite;
+}
+
+/* Language Marquee Animations */
+@keyframes marquee {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-33.33%);
+  }
+}
+
+@keyframes marquee-reverse {
+  0% {
+    transform: translateX(-33.33%);
+  }
+  100% {
+    transform: translateX(0%);
+  }
+}
+
+.animate-marquee {
+  animation: marquee 30s linear infinite;
+}
+
+.animate-marquee-reverse {
+  animation: marquee-reverse 35s linear infinite;
+}
+
+/* Hide scrollbar for showcase sections */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Thin scrollbar for chat sections */
+.scrollbar-thin {
+  scrollbar-width: thin;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 4px;
+}
+
+.scrollbar-thumb-violet-500\/30::-webkit-scrollbar-thumb {
+  background-color: rgba(139, 92, 246, 0.3);
+  border-radius: 2px;
+}
+
+.scrollbar-track-transparent::-webkit-scrollbar-track {
+  background: transparent;
+}

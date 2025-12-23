@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(~/.local/bin/alembic upgrade head)",
+      "Bash(cat:*)",
+      "Bash(ls:*)",
+      "Bash(host:*)",
+      "Bash(lsof:*)",
+      "Bash(npm run dev:*)",
+      "Bash(source:*)",
+      "Bash(uvicorn:*)",
+      "Bash(./venv/bin/python:*)",
+      "Bash(./venv/bin/pip:*)",
+      "Bash(kill:*)",
+      "Bash(/opt/homebrew/Cellar/python@3.12/3.12.12/bin/python3.12:*)",
+      "Bash(curl:*)"
+    ]
+  }
+}

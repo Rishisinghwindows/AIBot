@@ -1,0 +1,83 @@
+{
+  "horoscope": {
+    "intro": "यहाँ है आपका {sign} राशिफल",
+    "daily": "{sign} का आज का राशिफल",
+    "weekly": "{sign} का साप्ताहिक राशिफल",
+    "monthly": "{sign} का मासिक राशिफल",
+    "lucky_number": "भाग्यशाली अंक",
+    "lucky_color": "भाग्यशाली रंग",
+    "advice": "सलाह"
+  },
+  "birth_chart": {
+    "title": "जन्म कुंडली",
+    "ascendant": "लग्न",
+    "sun_sign": "सूर्य राशि",
+    "moon_sign": "चंद्र राशि",
+    "nakshatra": "नक्षत्र",
+    "enter_details": "कृपया अपना जन्म विवरण दर्ज करें"
+  },
+  "panchang": {
+    "title": "आज का पंचांग",
+    "tithi": "तिथि",
+    "nakshatra": "नक्षत्र",
+    "yoga": "योग",
+    "karana": "करण",
+    "paksha": "पक्ष",
+    "sunrise": "सूर्योदय",
+    "sunset": "सूर्यास्त",
+    "rahu_kaal": "राहु काल"
+  },
+  "numerology": {
+    "title": "अंक ज्योतिष विश्लेषण",
+    "life_path": "जीवन पथ अंक",
+    "destiny": "भाग्य अंक",
+    "soul_urge": "आत्मा अंक",
+    "lucky_numbers": "भाग्यशाली अंक"
+  },
+  "tarot": {
+    "title": "टैरो रीडिंग",
+    "question": "प्रश्न",
+    "overall": "समग्र व्याख्या"
+  },
+  "weather": {
+    "title": "मौसम",
+    "temperature": "तापमान",
+    "humidity": "आर्द्रता",
+    "condition": "स्थिति",
+    "enter_city": "कृपया शहर का नाम बताएं"
+  },
+  "pnr": {
+    "title": "पीएनआर स्थिति",
+    "train": "ट्रेन",
+    "from": "से",
+    "to": "तक",
+    "date": "तारीख",
+    "class": "श्रेणी",
+    "chart_prepared": "चार्ट तैयार",
+    "passenger_status": "यात्री स्थिति",
+    "booking_status": "बुकिंग स्थिति",
+    "current_status": "वर्तमान स्थिति"
+  },
+  "news": {
+    "title": "समाचार",
+    "no_articles": "कोई समाचार नहीं मिला",
+    "source": "स्रोत"
+  },
+  "image": {
+    "title": "चित्र निर्माण",
+    "generated": "चित्र बनाया गया",
+    "enter_prompt": "आप कौन सी तस्वीर बनवाना चाहते हैं?"
+  },
+  "errors": {
+    "general": "एक त्रुटि हुई। कृपया पुनः प्रयास करें।",
+    "service_unavailable": "यह सेवा अस्थायी रूप से अनुपलब्ध है।",
+    "invalid_input": "कृपया अपना इनपुट जांचें और पुनः प्रयास करें।"
+  },
+  "common": {
+    "yes": "हाँ",
+    "no": "नहीं",
+    "example": "उदाहरण",
+    "tips": "सुझाव",
+    "try_again": "कृपया पुनः प्रयास करें"
+  }
+}

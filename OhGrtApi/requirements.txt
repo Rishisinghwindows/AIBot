@@ -1,0 +1,35 @@
+fastapi
+uvicorn
+langchain
+langchain-community
+langchain-ollama
+langgraph
+psycopg2-binary
+sqlalchemy
+langchain-chroma
+pgvector
+structlog
+python-multipart
+pypdf
+httpx
+python-dotenv
+pydantic-settings
+google-api-python-client
+google-auth-httplib2
+google-auth-oauthlib
+openai
+langchain-openai
+google-api-core
+
+# Authentication
+firebase-admin
+PyJWT
+
+# Rate Limiting & Caching
+redis
+
+# Database Migrations
+alembic
+
+# Scheduling
+croniter

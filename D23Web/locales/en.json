@@ -1,0 +1,103 @@
+{
+  "meta": {
+    "code": "en",
+    "name": "English",
+    "nativeName": "English"
+  },
+  "nav": {
+    "features": "Features",
+    "about": "About",
+    "contact": "Contact",
+    "getStarted": "Get Started"
+  },
+  "hero": {
+    "badge": "India's #1 AI Assistant on WhatsApp",
+    "headline1": "Whatever you need",
+    "headline2": "just",
+    "headline3": "ask",
+    "subtitle": "Your AI assistant that speaks your language. Get instant answers in Hindi, Tamil, Telugu & 11+ regional languages.",
+    "ctaWhatsapp": "Start on WhatsApp",
+    "ctaWeb": "Try Web Chat",
+    "comingSoon": "Coming Soon on",
+    "appStore": "App Store",
+    "playStore": "Google Play",
+    "soon": "Soon"
+  },
+  "stats": {
+    "users": "Active Users",
+    "languages": "Languages",
+    "available": "Available",
+    "response": "Response"
+  },
+  "languages": {
+    "title": "Speak Your",
+    "titleHighlight": "Language",
+    "subtitle": "D23 AI understands and responds in 11+ Indian languages. Just chat naturally.",
+    "badge": "Multilingual Support"
+  },
+  "video": {
+    "label": "Watch",
+    "title": "See D23 AI in action",
+    "videoTitle": "D23 AI",
+    "videoSubtitle": "Launch Video"
+  },
+  "features": {
+    "label": "Features",
+    "title1": "Everything you need,",
+    "title2": "in your language",
+    "languages": {
+      "title": "11+ Languages",
+      "desc": "Hindi, Tamil, Telugu, Bengali & more"
+    },
+    "voice": {
+      "title": "Voice AI",
+      "desc": "Speak naturally, get voice replies"
+    },
+    "images": {
+      "title": "AI Images",
+      "desc": "Generate stunning visuals instantly"
+    },
+    "factCheck": {
+      "title": "Fact Check",
+      "desc": "Verify any message instantly"
+    },
+    "stickers": {
+      "title": "Stickers",
+      "desc": "Create custom WhatsApp stickers"
+    },
+    "games": {
+      "title": "Games",
+      "desc": "Play Wordle & more in WhatsApp"
+    }
+  },
+  "showcase": {
+    "label": "Showcase",
+    "title": "See what's possible",
+    "multilingual": "Multilingual",
+    "languagesCount": "11+ Languages"
+  },
+  "faq": {
+    "label": "FAQ",
+    "title": "Got",
+    "titleHighlight": "questions?",
+    "q1": "What is D23 AI?",
+    "a1": "An intelligent WhatsApp bot specializing in Indic languages for instant answers.",
+    "q2": "Which languages are supported?",
+    "a2": "Hindi, Marathi, Bengali, Tamil, Telugu, Kannada, Malayalam, Gujarati, Punjabi, Oriya and more.",
+    "q3": "Is it free?",
+    "a3": "Yes! You can start chatting without paying anything.",
+    "q4": "Can it fact-check?",
+    "a4": "Forward any message for verification. D23 AI searches reliable sources to detect misinformation."
+  },
+  "cta": {
+    "title": "Ready to try D23 AI?",
+    "subtitle": "Join thousands of Indians using D23 AI for instant answers in their language.",
+    "button1": "Start Chatting",
+    "button2": "Try Web Version"
+  },
+  "footer": {
+    "tagline": "WhatsApp-native AI for Bharat.",
+    "button": "Talk to D23 AI",
+    "copyright": "© 2025 D23 AI. Built for every Indian language."
+  }
+}

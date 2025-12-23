@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ohgrt-config
+  namespace: ohgrt
+  labels:
+    app.kubernetes.io/name: ohgrt-api
+    app.kubernetes.io/component: config
+data:
+  ENVIRONMENT: "production"
+  LOG_LEVEL: "INFO"
+  POSTGRES_PORT: "5432"
+  POSTGRES_SCHEMA: "agentic"
+  RATE_LIMIT_ENABLED: "true"
+  RATE_LIMIT_REQUESTS_PER_MINUTE: "60"
+  RATE_LIMIT_REQUESTS_PER_HOUR: "1000"
+  REQUEST_TIMESTAMP_TOLERANCE_SECONDS: "300"
+  NONCE_EXPIRY_HOURS: "24"

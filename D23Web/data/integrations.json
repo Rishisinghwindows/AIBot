@@ -1,0 +1,83 @@
+{
+  "hero": {
+    "title": "D23.AI Integrations",
+    "description": "Discover the power of AI-driven conversations with seamless integrations across platforms, services, and tools that matter to you."
+  },
+  "sections": [
+    {
+      "id": "core-capabilities",
+      "title": "Core AI Capabilities",
+      "features": [
+        {
+          "id": "conversational-ai",
+          "name": "Conversational AI",
+          "description": "General chat, Q&A, explanations, brainstorming, and task assistance.",
+          "details": "Engage in natural conversations for questions, answers, explanations, brainstorming, and task assistance.",
+          "howToUse": "Ask questions or give instructions. Add context, constraints, or examples for better results.",
+          "image": "/puch/features/salman-1.webp",
+          "tabs": [
+            { "id": "tab1", "label": "Chat" },
+            { "id": "tab2", "label": "Q&A" },
+            { "id": "tab3", "label": "Tasks" },
+            { "id": "tab4", "label": "Ideas" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "search-information",
+      "title": "Search & Information",
+      "features": [
+        {
+          "id": "search",
+          "name": "Search",
+          "description": "Search the internet or read specific webpages for information.",
+          "details": "Enables the Internet or search for information that may be outside the model's knowledge, or that is evolving.",
+          "howToUse": "Provide a query and optionally a URL if you have insights into return.",
+          "image": "/puch/features/salman-2.webp",
+          "tabs": [
+            { "id": "tab1", "label": "Web" },
+            { "id": "tab2", "label": "News" },
+            { "id": "tab3", "label": "Images" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "media-games",
+      "title": "Media Generation & Games",
+      "features": [
+        {
+          "id": "quiz",
+          "name": "Quiz",
+          "description": "Play fun quizzes on any topic in single or multiplayer mode.",
+          "details": "Play quizzes on any topic of your choice in single-player or multiplayer mode.",
+          "howToUse": "Type 'play' to start",
+          "image": "/puch/features/dragon-1.webp",
+          "tabs": [
+            { "id": "tab1", "label": "Single" },
+            { "id": "tab2", "label": "Multi" },
+            { "id": "tab3", "label": "Teams" },
+            { "id": "tab4", "label": "Custom" },
+            { "id": "tab5", "label": "Trivia" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "third-party",
+      "title": "Third-Party Integrations",
+      "features": [
+        {
+          "id": "train",
+          "name": "Train Features",
+          "description": "Check live train status, schedules, PNR status, and trains between stations.",
+          "details": "Inquire live running status (current location, ETA) for upcoming stations, status, info, check trains between stations.",
+          "howToUse": "For live status: mention and (optionally) the journey date if not today, e.g., 'Live status for 12954' OR 'Live status for 12954 on 2025-12-04'. For PNR: 'Check PNR 1234567890'",
+          "image": "/puch/assets/wordle/wordle1.jpeg",
+          "tabs": [{ "id": "tab1", "label": "Live" }, { "id": "tab2", "label": "PNR" }]
+        }
+      ]
+    }
+  ]
+}

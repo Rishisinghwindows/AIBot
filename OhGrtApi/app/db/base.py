@@ -1,0 +1,47 @@
+from __future__ import annotations
+
+from typing import Generator, Optional
+
+from sqlalchemy import create_engine
+from sqlalchemy.engine import Engine
+from sqlalchemy.orm import Session, declarative_base, sessionmaker
+
+from app.config import get_settings
+
+settings = get_settings()
+
+# Create engine without pool_pre_ping to avoid immediate connection attempt
+engine: Optional[Engine] = None
+SessionLocal: Optional[sessionmaker] = None
+
+try:
+    engine = create_engine(
+        settings.database_url,
+        pool_pre_ping=True,
+        pool_size=5,
+        max_overflow=10,
+    )
+    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+except Exception:
+    # Database not configured, engine will be None
+    pass
+
+Base = declarative_base()
+
+
+def get_db() -> Generator[Session, None, None]:
+    """FastAPI dependency that yields a database session."""
+    if SessionLocal is None:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=503, detail="Database not available")
+
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+def is_db_available() -> bool:
+    """Check if database is configured and available."""
+    return engine is not None and SessionLocal is not None

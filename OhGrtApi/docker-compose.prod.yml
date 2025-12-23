@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: .
+      target: production
+    container_name: ohgrt-api
+    ports:
+      - "9002:9002"
+    environment:
+      - ENVIRONMENT=production
+      - POSTGRES_HOST=${POSTGRES_HOST}
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_SCHEMA=${POSTGRES_SCHEMA:-agentic}
+      - REDIS_URL=${REDIS_URL}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENWEATHER_API_KEY=${OPENWEATHER_API_KEY}
+      - FIREBASE_CREDENTIALS_PATH=/app/secrets/firebase-credentials.json
+      - OLLAMA_SERVER=${OLLAMA_SERVER:-http://localhost:11434}
+      - LOG_LEVEL=INFO
+      - CORS_ORIGINS=${CORS_ORIGINS}
+      - RATE_LIMIT_ENABLED=true
+      - RATE_LIMIT_REQUESTS_PER_MINUTE=${RATE_LIMIT_REQUESTS_PER_MINUTE:-60}
+      - RATE_LIMIT_REQUESTS_PER_HOUR=${RATE_LIMIT_REQUESTS_PER_HOUR:-1000}
+    volumes:
+      - pdf_data:/app/data/pdfs
+      - chroma_data:/app/data/chroma
+      - ./secrets:/app/secrets:ro
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '1'
+          memory: 2G
+        reservations:
+          cpus: '0.25'
+          memory: 512M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9002/health/ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - ohgrt-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  pdf_data:
+  chroma_data:
+
+networks:
+  ohgrt-network:
+    driver: bridge

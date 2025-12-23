@@ -1,0 +1,48 @@
+{
+  "hero": {
+    "title": "Kuch bhi ho, bas",
+    "titleHighlight": "అడుగు",
+    "subtitle": "India's first AI assistant to har sawal, uski jawab mein hai. D23 AI hai har sawal ka smart jawaab!",
+    "whatsappButton": "WhatsApp",
+    "phoneNumber": "+91 9934438606"
+  },
+  "announcement": {
+    "title": "D23.AI × Messi",
+    "subtitle": "Win a chance to witness the GOAT himself!",
+    "cities": [
+      { "name": "KOLKATA", "date": "13 DEC" },
+      { "name": "HYDERABAD", "date": "13 DEC" },
+      { "name": "MUMBAI", "date": "14 DEC" },
+      { "name": "DELHI", "date": "15 DEC" }
+    ],
+    "ctaText": "Enter the giveaway",
+    "image": "/placeholder.svg?height=400&width=300"
+  },
+  "features": {
+    "title": "D23.AI is faster, smarter, and always ready.",
+    "categories": [
+      { "id": "multi-lang", "label": "Multi-Language Support", "active": true },
+      { "id": "image-gen", "label": "Image Generation" },
+      { "id": "video-gen", "label": "Video Generation" },
+      { "id": "voice", "label": "Voice Assistant" },
+      { "id": "shopify", "label": "Shopcharly" },
+      { "id": "fact-check", "label": "Fact Check" },
+      { "id": "stickers", "label": "Stickers" },
+      { "id": "games", "label": "Games" }
+    ],
+    "showcase": {
+      "title": "Multi-Language Support",
+      "description": "Connect naturally in your mother tongue. D23.AI responds fluently in Hindi, Marathi, Tamil, and more. Enjoy truly regional conversations with no limits.",
+    "ctaText": "Talk to D23 AI",
+      "images": [
+        "/placeholder.svg?height=600&width=350",
+        "/placeholder.svg?height=600&width=350",
+        "/placeholder.svg?height=600&width=350"
+      ]
+    }
+  },
+  "cta": {
+    "title": "Kuch bhi ho, bas D23.AI",
+    "buttonText": "Talk to D23.AI"
+  }
+}

@@ -1,0 +1,161 @@
+{
+  "hero": {
+    "title": "MCP With D23.AI",
+    "subtitle": "Control D23 with your own Model Context Protocol (MCP) server. Define custom tools and business logic without changing your client code.",
+    "info": {
+      "title": "What is MCP?",
+      "description": "The Model Context Protocol enables AI assistants to securely connect to external data sources and tools, extending their capabilities while maintaining security and user control."
+    }
+  },
+  "sidebar": [
+    {
+      "title": "Getting Started",
+      "items": [
+        { "label": "Protocol Compatibility", "href": "#protocol-compatibility" },
+        { "label": "Quick Setup Guide", "href": "#quick-setup" }
+      ]
+    },
+    {
+      "title": "Command Reference",
+      "items": [
+        { "label": "Connect with Bearer Token", "href": "#connect-bearer" },
+        { "label": "Connect with OAuth", "href": "#connect-oauth" },
+        { "label": "Use a hosted MCP server", "href": "#hosted-server" },
+        { "label": "Remove a server", "href": "#remove-server" },
+        { "label": "List connected servers", "href": "#list-servers" },
+        { "label": "Disconnect Server", "href": "#disconnect-server" },
+        { "label": "Set Diagnostic Level", "href": "#diagnostic-level" },
+        { "label": "Disable a server", "href": "#disable-server" },
+        { "label": "Enable a server", "href": "#enable-server" }
+      ]
+    },
+    {
+      "title": "MCP Server Requirements",
+      "items": []
+    },
+    {
+      "title": "Demos",
+      "items": [{ "label": "Connecting an MCP server with bearer token", "href": "#demo-bearer" }]
+    },
+    {
+      "title": "Need Help?",
+      "items": []
+    }
+  ],
+  "gettingStarted": {
+    "title": "Getting Started",
+    "sections": [
+      {
+        "id": "protocol-compatibility",
+        "title": "Protocol Compatibility",
+        "content": "D23 follows the core MCP specification with the following supported features:",
+        "supported": [
+          "Core protocol messages",
+          "Tool definition and calls",
+          "Authentication (Bearer & OAuth)",
+          "Error handling"
+        ],
+        "notSupported": ["Inline extensions", "Resource references", "Prompt templates", "Custom handlers"]
+      },
+      {
+        "id": "quick-setup",
+        "title": "Quick Setup Guide",
+        "steps": [
+          {
+            "number": 1,
+            "title": "Prepare Your MCP Server",
+            "description": "Ensure your MCP server is publicly accessible and serving over HTTPS."
+          },
+          {
+            "number": 2,
+            "title": "Connect from D23 Chat",
+            "description": "Use the /mcp connect command in any D23 conversation."
+          },
+          {
+            "number": 3,
+            "title": "Verify Connection",
+            "description": "D23 will confirm successful connection and show available tools, or display error messages for troubleshooting."
+          }
+        ]
+      }
+    ]
+  },
+  "commandReference": {
+    "title": "Command Reference",
+    "commands": [
+      {
+        "id": "connect-bearer",
+        "name": "Connect with Bearer Token",
+        "command": "/mcp connect <url> --bearer <token>",
+        "description": "Connect your MCP server with D23.AI. Your MCP server must have a reliable host that accepts the bearer token and returns the user's phone number in the format {country_code}{number} (e.g., 911234567890). This validation is required for authentication.",
+        "example": "Example: /mcp connect https://mcp.example.com/api/token abcd1234"
+      },
+      {
+        "id": "connect-oauth",
+        "name": "Connect with OAuth",
+        "command": "/mcp connect <url> --oauth",
+        "description": "For servers supporting OAuth authentication, a browser window may open for consent and authentication."
+      },
+      {
+        "id": "hosted-server",
+        "name": "Use a hosted MCP server",
+        "command": "/mcp hosted <server_url>",
+        "description": "Connect hosted MCP server using its unique identifier. You can connect to a pre-validated server a user from your org OR yourself has already connected to."
+      },
+      {
+        "id": "remove-server",
+        "name": "Remove a server",
+        "command": "/mcp remove <server_id>",
+        "description": "Remove a trusted MCP server from your list of connected servers."
+      },
+      {
+        "id": "list-servers",
+        "name": "List connected servers",
+        "command": "/mcp list",
+        "description": "List all your MCP server configurations."
+      },
+      {
+        "id": "disconnect-server",
+        "name": "Disconnect Server",
+        "command": "/mcp disconnect <server>",
+        "description": "Disconnect from a specific MCP server. You can re-enable the server later using the /mcp enable command."
+      },
+      {
+        "id": "diagnostic-level",
+        "name": "Set Diagnostic Level",
+        "command": "/mcp diagnostics-level <error|warning|info|debug>",
+        "description": "Control the amount of diagnostic information you receive from MCP operations. Available levels: error, warn, info, debug."
+      },
+      {
+        "id": "disable-server",
+        "name": "Disable a server",
+        "command": "/mcp disable <server_id>",
+        "description": "Disable a specific MCP server. This will stop it from connecting to the server but you won't be able to use the server until using the /mcp enable command."
+      },
+      {
+        "id": "enable-server",
+        "name": "Enable a server",
+        "command": "/mcp enable <server_id>",
+        "description": "Enable a specific MCP server. By default, the server you connected to will be enabled."
+      }
+    ]
+  },
+  "serverRequirements": {
+    "title": "MCP Server Requirements",
+    "requirements": [
+      {
+        "title": "Validate Tool",
+        "description": "Your MCP server must have a validate tool that returns the server owner's phone number in the format: {country_code}{number}",
+        "example": "Example: +19876543210 or +917894561230"
+      },
+      {
+        "title": "HTTPS Requirement",
+        "description": "All endpoints must be served over HTTPS for security. HTTP connections will be rejected."
+      },
+      {
+        "title": "Prepare for production",
+        "description": "Before going live, deploy on a hosting platform such as Vercel, Cloudflare, or any other service. Ensure that the server is publicly accessible so others can connect to it."
+      }
+    ]
+  }
+}

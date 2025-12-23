@@ -1,0 +1,92 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: .
+      target: production
+    container_name: ohgrt-api
+    ports:
+      - "9002:9002"
+    environment:
+      - ENVIRONMENT=development
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=ohgrt
+      - POSTGRES_SCHEMA=agentic
+      - REDIS_URL=redis://redis:6379/0
+      - OLLAMA_SERVER=http://host.docker.internal:11434
+      - LOG_LEVEL=DEBUG
+      - CORS_ORIGINS=*
+      - RATE_LIMIT_ENABLED=false
+    volumes:
+      - ./app:/app/app:ro
+      - pdf_data:/app/data/pdfs
+      - chroma_data:/app/data/chroma
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - ohgrt-network
+    restart: unless-stopped
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: ohgrt-postgres
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=ohgrt
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ohgrt"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ohgrt-network
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: ohgrt-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - ohgrt-network
+    restart: unless-stopped
+
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: ohgrt-chromadb
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma_server_data:/chroma/chroma
+    environment:
+      - ANONYMIZED_TELEMETRY=false
+    networks:
+      - ohgrt-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  pdf_data:
+  chroma_data:
+  chroma_server_data:
+
+networks:
+  ohgrt-network:
+    driver: bridge

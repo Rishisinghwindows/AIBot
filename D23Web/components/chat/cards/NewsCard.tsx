@@ -1,0 +1,120 @@
+"use client";
+
+import { Newspaper, ExternalLink, Clock, Tag } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+
+interface NewsItem {
+  title: string;
+  summary?: string;
+  description?: string;
+  source?: string;
+  url?: string;
+  published_at?: string;
+  category?: string;
+  image_url?: string;
+}
+
+interface NewsCardProps {
+  items: NewsItem[];
+  category?: string;
+}
+
+export function NewsCard({ items, category }: NewsCardProps) {
+  return (
+    <Card className="bg-card border-border overflow-hidden">
+      <CardHeader className="pb-3 bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border-b border-border">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-lg font-bold text-foreground flex items-center gap-2">
+            <Newspaper className="h-5 w-5 text-blue-400" />
+            {category ? `${category} News` : "Latest News"}
+          </CardTitle>
+          <Badge variant="outline" className="bg-muted/50 text-muted-foreground border-border">
+            {items.length} articles
+          </Badge>
+        </div>
+      </CardHeader>
+
+      <CardContent className="pt-4 space-y-3">
+        {items.map((item, idx) => (
+          <div
+            key={idx}
+            className="p-3 rounded-lg bg-muted/30 border border-border hover:bg-muted/50 transition-colors"
+          >
+            <div className="flex gap-3">
+              {/* Thumbnail */}
+              {item.image_url && (
+                <div className="flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden bg-muted">
+                  <img
+                    src={item.image_url}
+                    alt=""
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
+                  />
+                </div>
+              )}
+
+              {/* Content */}
+              <div className="flex-1 min-w-0">
+                <h4 className="text-sm font-medium text-foreground line-clamp-2 mb-1">
+                  {item.url ? (
+                    <a
+                      href={item.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="hover:text-primary transition-colors inline-flex items-center gap-1"
+                    >
+                      {item.title}
+                      <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                    </a>
+                  ) : (
+                    item.title
+                  )}
+                </h4>
+
+                {(item.summary || item.description) && (
+                  <p className="text-xs text-muted-foreground line-clamp-2 mb-2">{item.summary || item.description}</p>
+                )}
+
+                <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                  {item.source && (
+                    <span className="flex items-center gap-1">
+                      <Tag className="h-3 w-3" />
+                      {item.source}
+                    </span>
+                  )}
+                  {item.published_at && (
+                    <span className="flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      {formatTimeAgo(item.published_at)}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
+function formatTimeAgo(dateString: string): string {
+  try {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString();
+  } catch {
+    return dateString;
+  }
+}

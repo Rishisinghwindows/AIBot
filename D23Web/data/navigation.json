@@ -1,0 +1,15 @@
+{
+  "logo": "D23.AI",
+  "links": [
+    { "label": "Home", "href": "/" },
+    { "label": "Integrations", "href": "/integrations" },
+    { "label": "MCP", "href": "/mcp" },
+    { "label": "Careers", "href": "/careers" },
+    { "label": "About", "href": "/about" },
+    { "label": "Contact", "href": "/contact" }
+  ],
+  "cta": {
+    "label": "Try now",
+    "href": "https://api.whatsapp.com/send/?phone=%2B919934438606&text=Hey+D23%21+What+can+you+do%3F&type=phone_number&app_absent=0"
+  }
+}

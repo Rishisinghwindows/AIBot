@@ -1,0 +1,14 @@
+{
+  "hero": {
+    "title": "Get in Touch",
+    "subtitle": "Have questions? We'd love to hear from you. Send us a message and we'll respond as soon as possible."
+  },
+  "contactInfo": {
+    "email": "hello@d23.ai",
+    "social": {
+      "twitter": "https://twitter.com/d23ai",
+      "instagram": "https://instagram.com/d23ai",
+      "linkedin": "https://linkedin.com/company/d23ai"
+    }
+  }
+}
