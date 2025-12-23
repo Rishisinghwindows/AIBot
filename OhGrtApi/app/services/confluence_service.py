@@ -2,26 +2,25 @@ from __future__ import annotations
 
 import httpx
 
-from app.interfaces import ConfluenceSettingsProtocol
+from app.config import Settings
 from app.logger import logger
 from app.utils.errors import ServiceError
 
 
 class ConfluenceService:
     """
-    Confluence REST API client for searching and reading pages.
-
-    Accepts any settings object that implements ConfluenceSettingsProtocol,
-    allowing both app-level Settings and user-specific UserToolSettings.
+    Placeholder Confluence MCP/REST client.
+    Set CONFLUENCE_BASE_URL and CONFLUENCE_API_TOKEN/USER in .env to enable.
     """
 
     def __init__(
         self,
-        settings: ConfluenceSettingsProtocol,
+        settings: Settings,
         base_url_override: str | None = None,
         user_override: str | None = None,
         token_override: str | None = None,
     ):
+        self.settings = settings
         self.base_url = base_url_override or getattr(settings, "confluence_base_url", "")
         self.user = user_override or getattr(settings, "confluence_user", "")
         self.api_token = token_override or getattr(settings, "confluence_api_token", "")
@@ -52,5 +51,13 @@ class ConfluenceService:
                         formatted.append(title)
                 return "Confluence results: " + "; ".join(formatted)
         except Exception as exc:  # noqa: BLE001
-            logger.error("confluence_query_error", error=str(exc))
-            return f"Confluence unavailable: {exc}"
+            logger.error("confluence_query_error", error=_format_error(exc))
+            return f"Confluence unavailable: {_format_error(exc)}"
+
+
+def _format_error(exc: Exception) -> str:
+    if isinstance(exc, httpx.HTTPStatusError):
+        status = exc.response.status_code
+        body = exc.response.text[:500]
+        return f"HTTP {status}: {body}"
+    return str(exc)

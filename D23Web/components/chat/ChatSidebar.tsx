@@ -102,7 +102,7 @@ export function ChatSidebar({
             conversations.map((conv) => (
               <div
                 key={conv.id}
-                className={`group relative flex items-center gap-2 px-3 py-2.5 rounded-lg cursor-pointer transition-colors ${
+                className={`group flex items-center gap-2 px-3 py-2.5 rounded-lg cursor-pointer transition-colors ${
                   currentConversationId === conv.id
                     ? "bg-primary/20 text-foreground"
                     : "hover:bg-accent text-muted-foreground hover:text-foreground"
@@ -141,16 +141,16 @@ export function ChatSidebar({
                 ) : (
                   <>
                     <span
-                      className="flex-1 truncate text-sm pr-12"
+                      className="flex-1 truncate text-sm"
                       onClick={() => onSelectConversation(conv.id)}
                     >
                       {conv.title}
                     </span>
-                    <div className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-7 w-7 hover:bg-accent pointer-events-auto"
+                        className="h-7 w-7 hover:bg-accent"
                         onClick={(e) => {
                           e.stopPropagation();
                           onBeginEdit(conv.id, conv.title);
@@ -160,12 +160,7 @@ export function ChatSidebar({
                       </Button>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 hover:bg-accent pointer-events-auto"
-                            onClick={(e) => e.stopPropagation()}
-                          >
+                          <Button variant="ghost" size="icon" className="h-7 w-7 hover:bg-accent">
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>
                         </AlertDialogTrigger>

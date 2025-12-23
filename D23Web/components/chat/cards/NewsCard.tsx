@@ -22,14 +22,14 @@ interface NewsCardProps {
 
 export function NewsCard({ items, category }: NewsCardProps) {
   return (
-    <Card className="bg-card border-border overflow-hidden">
-      <CardHeader className="pb-3 bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border-b border-border">
+    <Card className="bg-gradient-to-br from-zinc-900 to-zinc-950 border-zinc-800 overflow-hidden">
+      <CardHeader className="pb-3 bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border-b border-zinc-800">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-lg font-bold text-foreground flex items-center gap-2">
+          <CardTitle className="text-lg font-bold text-white flex items-center gap-2">
             <Newspaper className="h-5 w-5 text-blue-400" />
             {category ? `${category} News` : "Latest News"}
           </CardTitle>
-          <Badge variant="outline" className="bg-muted/50 text-muted-foreground border-border">
+          <Badge variant="outline" className="bg-zinc-800/50 text-zinc-300 border-zinc-700">
             {items.length} articles
           </Badge>
         </div>
@@ -39,12 +39,12 @@ export function NewsCard({ items, category }: NewsCardProps) {
         {items.map((item, idx) => (
           <div
             key={idx}
-            className="p-3 rounded-lg bg-muted/30 border border-border hover:bg-muted/50 transition-colors"
+            className="p-3 rounded-lg bg-zinc-800/30 border border-zinc-700/50 hover:bg-zinc-800/50 transition-colors"
           >
             <div className="flex gap-3">
               {/* Thumbnail */}
               {item.image_url && (
-                <div className="flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden bg-muted">
+                <div className="flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden bg-zinc-800">
                   <img
                     src={item.image_url}
                     alt=""
@@ -58,13 +58,13 @@ export function NewsCard({ items, category }: NewsCardProps) {
 
               {/* Content */}
               <div className="flex-1 min-w-0">
-                <h4 className="text-sm font-medium text-foreground line-clamp-2 mb-1">
+                <h4 className="text-sm font-medium text-white line-clamp-2 mb-1">
                   {item.url ? (
                     <a
                       href={item.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="hover:text-primary transition-colors inline-flex items-center gap-1"
+                      className="hover:text-blue-400 transition-colors inline-flex items-center gap-1"
                     >
                       {item.title}
                       <ExternalLink className="h-3 w-3 flex-shrink-0" />
@@ -75,10 +75,10 @@ export function NewsCard({ items, category }: NewsCardProps) {
                 </h4>
 
                 {(item.summary || item.description) && (
-                  <p className="text-xs text-muted-foreground line-clamp-2 mb-2">{item.summary || item.description}</p>
+                  <p className="text-xs text-zinc-500 line-clamp-2 mb-2">{item.summary || item.description}</p>
                 )}
 
-                <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                <div className="flex items-center gap-3 text-xs text-zinc-500">
                   {item.source && (
                     <span className="flex items-center gap-1">
                       <Tag className="h-3 w-3" />

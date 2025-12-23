@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
-from app.auth.dependencies import get_current_user, get_optional_user
+from app.auth.dependencies import get_current_user
 from app.chat.models import (
     ChatHistoryResponse,
     ChatMessageResponse,
@@ -286,48 +286,38 @@ async def delete_conversation(
 
 
 async def generate_sse_response(
+    user: User,
     message: str,
     settings: Settings,
     db: Session,
-    user: Optional[User] = None,
-    session_id: Optional[str] = None,
     conversation_id: Optional[UUID] = None,
     allowed_tools: Optional[List[str]] = None,
 ) -> AsyncGenerator[str, None]:
-    """Generate Server-Sent Events for streaming chat response.
-
-    Supports both authenticated users and anonymous sessions.
-    """
+    """Generate Server-Sent Events for streaming chat response."""
     from uuid import uuid4
-    from app.db.models import ChatMessage
 
     # Generate or use conversation ID
     conv_id = conversation_id or uuid4()
 
-    # Send conversation_id/session_id event
-    if user:
-        yield f"event: conversation_id\ndata: {json.dumps({'conversation_id': str(conv_id)})}\n\n"
-    else:
-        yield f"event: session_id\ndata: {json.dumps({'session_id': session_id or str(conv_id)})}\n\n"
+    # Store user message first
+    from app.db.models import ChatMessage
+    user_msg = ChatMessage(
+        user_id=user.id,
+        conversation_id=conv_id,
+        role="user",
+        content=message,
+        message_metadata={},
+    )
+    db.add(user_msg)
+    db.commit()
+    db.refresh(user_msg)
 
-    # Store user message (only for authenticated users with DB storage)
-    if user:
-        user_msg = ChatMessage(
-            user_id=user.id,
-            conversation_id=conv_id,
-            role="user",
-            content=message,
-            message_metadata={},
-        )
-        db.add(user_msg)
-        db.commit()
-        db.refresh(user_msg)
+    # Send conversation_id event
+    yield f"event: conversation_id\ndata: {json.dumps({'conversation_id': str(conv_id)})}\n\n"
 
-    # Load user credentials (only for authenticated users)
-    credentials = {}
-    if user:
-        service = ChatService(settings, db)
-        credentials = service._load_credentials(user)
+    # Load user credentials
+    service = ChatService(settings, db)
+    credentials = service._load_credentials(user)
 
     try:
         # Build agent and invoke
@@ -338,8 +328,6 @@ async def generate_sse_response(
         route_log = result.get("route_log", [])
         category = result.get("category", "chat")
         media_url = result.get("media_url")
-        intent = result.get("intent")
-        structured_data = result.get("structured_data")
 
         # Send content in chunks for streaming effect
         chunk_size = 50
@@ -355,45 +343,33 @@ async def generate_sse_response(
         }
         if media_url:
             metadata["media_url"] = media_url
-        if intent:
-            metadata["intent"] = intent
-        if structured_data:
-            metadata["structured_data"] = structured_data
 
         yield f"event: metadata\ndata: {json.dumps(metadata)}\n\n"
 
-        # Store assistant message (only for authenticated users)
-        if user:
-            msg_metadata = {
+        # Store assistant message
+        assistant_msg = ChatMessage(
+            user_id=user.id,
+            conversation_id=conv_id,
+            role="assistant",
+            content=ai_content,
+            message_metadata={
                 "category": category,
                 "route_log": ", ".join(route_log) if isinstance(route_log, list) else str(route_log),
-            }
-            if media_url:
-                msg_metadata["media_url"] = media_url
-            if intent:
-                msg_metadata["intent"] = intent
-            if structured_data:
-                msg_metadata["structured_data"] = structured_data
-
-            assistant_msg = ChatMessage(
-                user_id=user.id,
-                conversation_id=conv_id,
-                role="assistant",
-                content=ai_content,
-                message_metadata=msg_metadata,
-            )
-            db.add(assistant_msg)
-            db.commit()
+                "media_url": media_url,
+            },
+        )
+        db.add(assistant_msg)
+        db.commit()
 
         logger.info(
             "streaming_chat_complete",
-            user_id=str(user.id) if user else "anonymous",
+            user_id=str(user.id),
             conversation_id=str(conv_id),
             category=category,
         )
 
     except Exception as e:
-        logger.error("streaming_chat_error", error=str(e), user_id=str(user.id) if user else "anonymous")
+        logger.error("streaming_chat_error", error=str(e), user_id=str(user.id))
         error_msg = "I apologize, but an error occurred while processing your request."
         yield f"event: error\ndata: {json.dumps({'error': error_msg})}\n\n"
 
@@ -407,46 +383,35 @@ async def generate_sse_response(
     description="""
 Send a message and receive a streaming AI response via Server-Sent Events (SSE).
 
-Supports both authenticated users (with Bearer token) and anonymous users (with session_id).
-
 ## Events
-- `conversation_id`: Contains the conversation ID (for authenticated users)
-- `session_id`: Contains the session ID (for anonymous users)
+- `conversation_id`: Contains the conversation ID
 - `chunk`: Contains a chunk of the response content
-- `metadata`: Contains response metadata (category, tools used, media_url, intent, structured_data)
+- `metadata`: Contains response metadata (category, tools used, media_url)
 - `error`: Contains error information if something went wrong
 - `done`: Signals the end of the stream
 
 ## Usage
 ```javascript
-// For authenticated users - include Bearer token in headers
-// For anonymous users - include session_id in request body
-fetch('/chat/ask', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message: "Hello", session_id: "optional-for-anonymous" })
-});
+const eventSource = new EventSource('/chat/ask', { method: 'POST', body: JSON.stringify({message: "Hello"}) });
+eventSource.addEventListener('chunk', (e) => console.log(JSON.parse(e.data).content));
 ```
     """,
 )
 async def streaming_ask(
     request: StreamingAskRequest,
-    user: Optional[User] = Depends(get_optional_user),
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
     settings: Settings = Depends(get_settings),
 ):
     """
     Send a message and receive a streaming AI response via SSE.
-
-    Works for both authenticated and anonymous users.
     """
     return StreamingResponse(
         generate_sse_response(
+            user=user,
             message=request.message,
             settings=settings,
             db=db,
-            user=user,
-            session_id=request.session_id,
             conversation_id=request.conversation_id,
             allowed_tools=request.tools,
         ),

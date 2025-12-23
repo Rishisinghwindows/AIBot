@@ -1,340 +1,334 @@
+"""Uber API Service.
+
+Provides ride history, price estimates, and ride status functionality.
+Requires OAuth credentials stored via /uber/oauth-url flow.
+"""
+
 from __future__ import annotations
 
-from typing import Optional, Dict, Any, List
+from typing import Any, Dict, List, Optional
 
 import httpx
 
 from app.logger import logger
 
 
+# Uber API endpoints
+UBER_API_BASE = "https://api.uber.com"
+UBER_PROFILE_URL = f"{UBER_API_BASE}/v1.2/me"
+UBER_HISTORY_URL = f"{UBER_API_BASE}/v1.2/history"
+UBER_PRODUCTS_URL = f"{UBER_API_BASE}/v1.2/products"
+UBER_ESTIMATES_PRICE_URL = f"{UBER_API_BASE}/v1.2/estimates/price"
+UBER_ESTIMATES_TIME_URL = f"{UBER_API_BASE}/v1.2/estimates/time"
+
+
 class UberService:
-    """
-    Uber API service for ride estimates, ride requests, and trip history.
+    """Service for interacting with Uber API."""
 
-    Note: Uber API requires OAuth 2.0 authentication and approved developer access.
-    See: https://developer.uber.com/docs/riders/introduction
-    """
+    def __init__(self, access_token: Optional[str] = None):
+        """
+        Initialize Uber service.
 
-    def __init__(
-        self,
-        *,
-        access_token: str = None,
-        client_id: str = None,
-        client_secret: str = None,
-        sandbox: bool = True,
-    ):
-        self.access_token = access_token or ""
-        self.client_id = client_id or ""
-        self.client_secret = client_secret or ""
-        self.sandbox = sandbox
-        self.base_url = (
-            "https://sandbox-api.uber.com/v1.2"
-            if sandbox
-            else "https://api.uber.com/v1.2"
-        )
-        self.available = bool(self.access_token)
+        Args:
+            access_token: OAuth access token from Uber
+        """
+        self.access_token = access_token
+        self.available = bool(access_token)
 
     def _get_headers(self) -> Dict[str, str]:
+        """Get API request headers."""
         return {
             "Authorization": f"Bearer {self.access_token}",
             "Content-Type": "application/json",
             "Accept-Language": "en_US",
         }
 
-    async def get_products(
-        self,
-        latitude: float,
-        longitude: float,
-    ) -> str:
+    async def get_profile(self) -> Dict[str, Any]:
         """
-        Get available Uber products/ride types at a location.
+        Get user profile information.
 
-        Args:
-            latitude: Pickup location latitude
-            longitude: Pickup location longitude
+        Returns:
+            Dict with user profile data
         """
         if not self.available:
-            return "Uber service is not configured. Please connect Uber in Settings."
+            return {"success": False, "error": "Uber not connected"}
 
         try:
-            async with httpx.AsyncClient(timeout=30) as client:
-                resp = await client.get(
-                    f"{self.base_url}/products",
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.get(
+                    UBER_PROFILE_URL,
                     headers=self._get_headers(),
-                    params={
-                        "latitude": latitude,
-                        "longitude": longitude,
-                    },
                 )
 
-                if resp.status_code != 200:
-                    return f"Failed to get Uber products: {resp.status_code} - {resp.text}"
+                if response.status_code == 200:
+                    data = response.json()
+                    return {
+                        "success": True,
+                        "data": {
+                            "first_name": data.get("first_name"),
+                            "last_name": data.get("last_name"),
+                            "email": data.get("email"),
+                            "picture": data.get("picture"),
+                            "rider_id": data.get("rider_id") or data.get("uuid"),
+                        },
+                    }
+                elif response.status_code == 401:
+                    return {"success": False, "error": "Uber token expired. Please reconnect."}
+                else:
+                    logger.error(f"Uber profile error: {response.status_code} - {response.text}")
+                    return {"success": False, "error": f"API error: {response.status_code}"}
 
-                data = resp.json()
-                products = data.get("products", [])
+        except Exception as e:
+            logger.error(f"Uber profile exception: {e}")
+            return {"success": False, "error": str(e)}
 
-                if not products:
-                    return "No Uber products available at this location."
+    async def get_ride_history(self, limit: int = 10, offset: int = 0) -> Dict[str, Any]:
+        """
+        Get user's ride history.
 
-                results = []
-                for product in products:
-                    name = product.get("display_name", "Unknown")
-                    description = product.get("description", "")
-                    capacity = product.get("capacity", "Unknown")
-                    price_details = product.get("price_details", {})
-                    base = price_details.get("base", 0)
-                    per_minute = price_details.get("cost_per_minute", 0)
-                    per_km = price_details.get("cost_per_distance", 0)
-                    currency = price_details.get("currency_code", "INR")
+        Args:
+            limit: Maximum number of rides to return (max 50)
+            offset: Offset for pagination
 
-                    results.append(
-                        f"- {name}\n"
-                        f"  {description}\n"
-                        f"  Capacity: {capacity} | Base: {currency} {base}\n"
-                        f"  Per minute: {currency} {per_minute} | Per km: {currency} {per_km}"
-                    )
+        Returns:
+            Dict with ride history data
+        """
+        if not self.available:
+            return {"success": False, "error": "Uber not connected"}
 
-                return "Available Uber Products:\n\n" + "\n\n".join(results)
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.get(
+                    UBER_HISTORY_URL,
+                    headers=self._get_headers(),
+                    params={"limit": min(limit, 50), "offset": offset},
+                )
 
-        except Exception as exc:
-            logger.error("uber_products_error", error=str(exc))
-            return f"Uber error: {exc}"
+                if response.status_code == 200:
+                    data = response.json()
+                    rides = []
+
+                    for ride in data.get("history", []):
+                        rides.append({
+                            "ride_id": ride.get("request_id") or ride.get("uuid"),
+                            "status": ride.get("status"),
+                            "start_time": ride.get("start_time"),
+                            "end_time": ride.get("end_time"),
+                            "distance": ride.get("distance"),
+                            "start_city": ride.get("start_city", {}).get("display_name"),
+                            "product_id": ride.get("product_id"),
+                        })
+
+                    return {
+                        "success": True,
+                        "data": {
+                            "rides": rides,
+                            "count": data.get("count", len(rides)),
+                            "offset": data.get("offset", offset),
+                            "limit": data.get("limit", limit),
+                        },
+                    }
+                elif response.status_code == 401:
+                    return {"success": False, "error": "Uber token expired. Please reconnect."}
+                else:
+                    logger.error(f"Uber history error: {response.status_code} - {response.text}")
+                    return {"success": False, "error": f"API error: {response.status_code}"}
+
+        except Exception as e:
+            logger.error(f"Uber history exception: {e}")
+            return {"success": False, "error": str(e)}
 
     async def get_price_estimate(
         self,
-        start_latitude: float,
-        start_longitude: float,
-        end_latitude: float,
-        end_longitude: float,
-    ) -> str:
+        start_lat: float,
+        start_lng: float,
+        end_lat: float,
+        end_lng: float,
+    ) -> Dict[str, Any]:
         """
-        Get price estimates for a trip.
+        Get price estimates for a ride.
 
         Args:
-            start_latitude: Pickup latitude
-            start_longitude: Pickup longitude
-            end_latitude: Dropoff latitude
-            end_longitude: Dropoff longitude
+            start_lat: Starting latitude
+            start_lng: Starting longitude
+            end_lat: Ending latitude
+            end_lng: Ending longitude
+
+        Returns:
+            Dict with price estimates for different products
         """
         if not self.available:
-            return "Uber service is not configured. Please connect Uber in Settings."
+            return {"success": False, "error": "Uber not connected"}
 
         try:
-            async with httpx.AsyncClient(timeout=30) as client:
-                resp = await client.get(
-                    f"{self.base_url}/estimates/price",
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.get(
+                    UBER_ESTIMATES_PRICE_URL,
                     headers=self._get_headers(),
                     params={
-                        "start_latitude": start_latitude,
-                        "start_longitude": start_longitude,
-                        "end_latitude": end_latitude,
-                        "end_longitude": end_longitude,
+                        "start_latitude": start_lat,
+                        "start_longitude": start_lng,
+                        "end_latitude": end_lat,
+                        "end_longitude": end_lng,
                     },
                 )
 
-                if resp.status_code != 200:
-                    return f"Failed to get price estimate: {resp.status_code}"
+                if response.status_code == 200:
+                    data = response.json()
+                    estimates = []
 
-                data = resp.json()
-                prices = data.get("prices", [])
+                    for price in data.get("prices", []):
+                        estimates.append({
+                            "product_name": price.get("display_name") or price.get("localized_display_name"),
+                            "estimate": price.get("estimate"),
+                            "low_estimate": price.get("low_estimate"),
+                            "high_estimate": price.get("high_estimate"),
+                            "currency": price.get("currency_code"),
+                            "duration": price.get("duration"),  # seconds
+                            "distance": price.get("distance"),  # miles
+                            "surge_multiplier": price.get("surge_multiplier", 1.0),
+                        })
 
-                if not prices:
-                    return "No price estimates available for this route."
+                    return {
+                        "success": True,
+                        "data": {
+                            "estimates": estimates,
+                            "start": {"lat": start_lat, "lng": start_lng},
+                            "end": {"lat": end_lat, "lng": end_lng},
+                        },
+                    }
+                elif response.status_code == 401:
+                    return {"success": False, "error": "Uber token expired. Please reconnect."}
+                elif response.status_code == 422:
+                    return {"success": False, "error": "Invalid location coordinates"}
+                else:
+                    logger.error(f"Uber price estimate error: {response.status_code} - {response.text}")
+                    return {"success": False, "error": f"API error: {response.status_code}"}
 
-                results = []
-                for price in prices:
-                    name = price.get("display_name", "Unknown")
-                    estimate = price.get("estimate", "Unknown")
-                    duration = price.get("duration", 0) // 60
-                    distance = price.get("distance", 0)
-                    surge = price.get("surge_multiplier", 1.0)
-
-                    surge_text = f" (Surge: {surge}x)" if surge > 1.0 else ""
-
-                    results.append(
-                        f"- {name}: {estimate}{surge_text}\n"
-                        f"  Distance: {distance:.1f} km | Duration: ~{duration} mins"
-                    )
-
-                return "Uber Price Estimates:\n\n" + "\n\n".join(results)
-
-        except Exception as exc:
-            logger.error("uber_price_error", error=str(exc))
-            return f"Uber error: {exc}"
+        except Exception as e:
+            logger.error(f"Uber price estimate exception: {e}")
+            return {"success": False, "error": str(e)}
 
     async def get_time_estimate(
         self,
-        latitude: float,
-        longitude: float,
+        start_lat: float,
+        start_lng: float,
         product_id: Optional[str] = None,
-    ) -> str:
+    ) -> Dict[str, Any]:
         """
-        Get ETA for Uber drivers at a location.
+        Get ETA for Uber products at a location.
 
         Args:
-            latitude: Pickup latitude
-            longitude: Pickup longitude
+            start_lat: Starting latitude
+            start_lng: Starting longitude
             product_id: Optional specific product ID
+
+        Returns:
+            Dict with time estimates for different products
         """
         if not self.available:
-            return "Uber service is not configured. Please connect Uber in Settings."
+            return {"success": False, "error": "Uber not connected"}
 
         try:
-            params: Dict[str, Any] = {
-                "start_latitude": latitude,
-                "start_longitude": longitude,
+            params = {
+                "start_latitude": start_lat,
+                "start_longitude": start_lng,
             }
             if product_id:
                 params["product_id"] = product_id
 
-            async with httpx.AsyncClient(timeout=30) as client:
-                resp = await client.get(
-                    f"{self.base_url}/estimates/time",
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.get(
+                    UBER_ESTIMATES_TIME_URL,
                     headers=self._get_headers(),
                     params=params,
                 )
 
-                if resp.status_code != 200:
-                    return f"Failed to get time estimate: {resp.status_code}"
+                if response.status_code == 200:
+                    data = response.json()
+                    estimates = []
 
-                data = resp.json()
-                times = data.get("times", [])
+                    for time in data.get("times", []):
+                        estimates.append({
+                            "product_name": time.get("display_name") or time.get("localized_display_name"),
+                            "product_id": time.get("product_id"),
+                            "eta_seconds": time.get("estimate"),  # seconds
+                            "eta_minutes": round(time.get("estimate", 0) / 60, 1),
+                        })
 
-                if not times:
-                    return "No Uber drivers available at this location."
-
-                results = []
-                for time_est in times:
-                    name = time_est.get("display_name", "Unknown")
-                    estimate = time_est.get("estimate", 0) // 60
-
-                    results.append(f"- {name}: ~{estimate} mins away")
-
-                return "Uber Driver ETAs:\n\n" + "\n".join(results)
-
-        except Exception as exc:
-            logger.error("uber_time_error", error=str(exc))
-            return f"Uber error: {exc}"
-
-    async def get_ride_history(self, limit: int = 10) -> str:
-        """Get user's recent ride history."""
-        if not self.available:
-            return "Uber service is not configured. Please connect Uber in Settings."
-
-        try:
-            async with httpx.AsyncClient(timeout=30) as client:
-                resp = await client.get(
-                    f"{self.base_url}/history",
-                    headers=self._get_headers(),
-                    params={"limit": limit},
-                )
-
-                if resp.status_code != 200:
-                    return f"Failed to get ride history: {resp.status_code}"
-
-                data = resp.json()
-                history = data.get("history", [])
-
-                if not history:
-                    return "No ride history found."
-
-                results = []
-                for ride in history:
-                    start_city = ride.get("start_city", {}).get("display_name", "Unknown")
-                    distance = ride.get("distance", 0)
-                    start_time = ride.get("start_time", "Unknown")
-                    end_time = ride.get("end_time", "Unknown")
-                    status = ride.get("status", "Unknown")
-
-                    results.append(
-                        f"- {start_city} | {distance:.1f} km\n"
-                        f"  Start: {start_time} | End: {end_time}\n"
-                        f"  Status: {status}"
-                    )
-
-                return "Recent Uber Rides:\n\n" + "\n\n".join(results)
-
-        except Exception as exc:
-            logger.error("uber_history_error", error=str(exc))
-            return f"Uber error: {exc}"
-
-    async def request_ride(
-        self,
-        product_id: str,
-        start_latitude: float,
-        start_longitude: float,
-        end_latitude: float,
-        end_longitude: float,
-        start_address: Optional[str] = None,
-        end_address: Optional[str] = None,
-    ) -> str:
-        """
-        Request an Uber ride.
-
-        Note: This only works in sandbox mode unless you have production access.
-        """
-        if not self.available:
-            return "Uber service is not configured. Please connect Uber in Settings."
-
-        if not self.sandbox:
-            return "Ride requests are only available in sandbox mode for this integration."
-
-        try:
-            payload: Dict[str, Any] = {
-                "product_id": product_id,
-                "start_latitude": start_latitude,
-                "start_longitude": start_longitude,
-                "end_latitude": end_latitude,
-                "end_longitude": end_longitude,
-            }
-            if start_address:
-                payload["start_address"] = start_address
-            if end_address:
-                payload["end_address"] = end_address
-
-            async with httpx.AsyncClient(timeout=30) as client:
-                resp = await client.post(
-                    f"{self.base_url}/requests",
-                    headers=self._get_headers(),
-                    json=payload,
-                )
-
-                if resp.status_code not in (200, 201, 202):
-                    return f"Failed to request ride: {resp.status_code} - {resp.text}"
-
-                data = resp.json()
-                request_id = data.get("request_id", "Unknown")
-                status = data.get("status", "Unknown")
-                eta = data.get("eta", "Unknown")
-
-                return (
-                    f"Uber Ride Requested!\n"
-                    f"Request ID: {request_id}\n"
-                    f"Status: {status}\n"
-                    f"ETA: {eta} minutes"
-                )
-
-        except Exception as exc:
-            logger.error("uber_request_error", error=str(exc))
-            return f"Uber error: {exc}"
-
-    async def cancel_ride(self, request_id: str) -> str:
-        """Cancel an active ride request."""
-        if not self.available:
-            return "Uber service is not configured. Please connect Uber in Settings."
-
-        try:
-            async with httpx.AsyncClient(timeout=30) as client:
-                resp = await client.delete(
-                    f"{self.base_url}/requests/{request_id}",
-                    headers=self._get_headers(),
-                )
-
-                if resp.status_code == 204:
-                    return f"Ride {request_id} cancelled successfully."
+                    return {
+                        "success": True,
+                        "data": {
+                            "estimates": estimates,
+                            "location": {"lat": start_lat, "lng": start_lng},
+                        },
+                    }
+                elif response.status_code == 401:
+                    return {"success": False, "error": "Uber token expired. Please reconnect."}
                 else:
-                    return f"Failed to cancel ride: {resp.status_code}"
+                    logger.error(f"Uber time estimate error: {response.status_code} - {response.text}")
+                    return {"success": False, "error": f"API error: {response.status_code}"}
 
-        except Exception as exc:
-            logger.error("uber_cancel_error", error=str(exc))
-            return f"Uber error: {exc}"
+        except Exception as e:
+            logger.error(f"Uber time estimate exception: {e}")
+            return {"success": False, "error": str(e)}
+
+    async def get_products(
+        self,
+        lat: float,
+        lng: float,
+    ) -> Dict[str, Any]:
+        """
+        Get available Uber products at a location.
+
+        Args:
+            lat: Latitude
+            lng: Longitude
+
+        Returns:
+            Dict with available products
+        """
+        if not self.available:
+            return {"success": False, "error": "Uber not connected"}
+
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.get(
+                    UBER_PRODUCTS_URL,
+                    headers=self._get_headers(),
+                    params={
+                        "latitude": lat,
+                        "longitude": lng,
+                    },
+                )
+
+                if response.status_code == 200:
+                    data = response.json()
+                    products = []
+
+                    for product in data.get("products", []):
+                        products.append({
+                            "product_id": product.get("product_id"),
+                            "name": product.get("display_name"),
+                            "description": product.get("description"),
+                            "capacity": product.get("capacity"),
+                            "image": product.get("image"),
+                            "shared": product.get("shared", False),
+                        })
+
+                    return {
+                        "success": True,
+                        "data": {
+                            "products": products,
+                            "location": {"lat": lat, "lng": lng},
+                        },
+                    }
+                elif response.status_code == 401:
+                    return {"success": False, "error": "Uber token expired. Please reconnect."}
+                else:
+                    logger.error(f"Uber products error: {response.status_code} - {response.text}")
+                    return {"success": False, "error": f"API error: {response.status_code}"}
+
+        except Exception as e:
+            logger.error(f"Uber products exception: {e}")
+            return {"success": False, "error": str(e)}

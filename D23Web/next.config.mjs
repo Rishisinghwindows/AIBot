@@ -19,7 +19,6 @@ const cspDirectives = {
   'connect-src': [
     "'self'",
     "http://localhost:*", // Local API for dev
-    "http://127.0.0.1:*", // Local API for dev (IP)
     "https://api.whatsapp.com",
     "https://accounts.google.com",
     "https://oauth2.googleapis.com",
@@ -32,8 +31,6 @@ const cspDirectives = {
     "https://va.vercel-scripts.com", // Vercel Analytics
     "ws://localhost:*", // WebSocket for dev
     "wss://localhost:*",
-    "ws://d23ai.in",  // WebSocket for dev via domain (HTTP)
-    "wss://d23ai.in", // WebSocket for dev via domain (HTTPS)
   ],
   'frame-src': [
     "'self'",
@@ -55,9 +52,6 @@ const nextConfig = {
   // TypeScript errors will now fail the build (recommended for production)
   // If you need to temporarily ignore errors during development, set:
   // typescript: { ignoreBuildErrors: true },
-
-  // Allow dev server access from custom domain
-  allowedDevOrigins: ['d23ai.in'],
 
   images: {
     // Enable image optimization for production

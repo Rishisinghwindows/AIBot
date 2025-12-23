@@ -108,7 +108,6 @@ class StreamingAskRequest(BaseModel):
 
     message: str = Field(..., min_length=1, max_length=4000, description="User message")
     conversation_id: Optional[UUID] = Field(None, description="Continue existing conversation")
-    session_id: Optional[str] = Field(None, description="Session ID for anonymous users (used when not authenticated)")
     tools: Optional[List[str]] = Field(None, description="Optional list of tool names to enable")
 
 

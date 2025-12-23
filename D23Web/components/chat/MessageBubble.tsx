@@ -106,18 +106,23 @@ export function MessageBubble({
           isUser ? "items-end" : "items-start"
         )}
       >
-        {/* Rich Card (if available) - hide text bubble when card is shown */}
-        {richCard ? (
-          <div className="w-full max-w-md">
+        {/* Rich Card (if available) */}
+        {richCard && (
+          <div className="mb-2 w-full max-w-md">
             {richCard}
           </div>
-        ) : (
+        )}
+
+        {/* Text Message (show if no rich card OR alongside rich card for context) */}
+        {(!richCard || message.content) && (
           <div
             className={cn(
               "rounded-2xl px-4 py-2.5 text-sm leading-relaxed",
               isUser
                 ? "bg-primary text-primary-foreground rounded-tr-sm"
-                : "bg-muted text-foreground rounded-tl-sm"
+                : richCard
+                  ? "bg-zinc-800/50 text-zinc-400 text-xs rounded-tl-sm"
+                  : "bg-muted text-foreground rounded-tl-sm"
             )}
           >
             {/* Render message with line breaks and code highlighting */}
@@ -163,7 +168,7 @@ export function MessageBubble({
                   <TooltipTrigger asChild>
                     <button
                       onClick={handleCopy}
-                      className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                      className="p-1 rounded hover:bg-zinc-800 text-zinc-500 hover:text-zinc-300 transition-colors"
                     >
                       {copied ? (
                         <Check className="w-3.5 h-3.5 text-green-400" />
@@ -183,7 +188,7 @@ export function MessageBubble({
                     <TooltipTrigger asChild>
                       <button
                         onClick={onRegenerate}
-                        className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                        className="p-1 rounded hover:bg-zinc-800 text-zinc-500 hover:text-zinc-300 transition-colors"
                       >
                         <RefreshCw className="w-3.5 h-3.5" />
                       </button>
@@ -195,7 +200,7 @@ export function MessageBubble({
                 )}
 
                 {/* Feedback buttons */}
-                <div className="flex items-center gap-0.5 ml-1 border-l border-border pl-1">
+                <div className="flex items-center gap-0.5 ml-1 border-l border-zinc-800 pl-1">
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <button
@@ -204,7 +209,7 @@ export function MessageBubble({
                           "p-1 rounded transition-colors",
                           feedback === "up"
                             ? "text-green-400 bg-green-400/10"
-                            : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                            : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800"
                         )}
                       >
                         <ThumbsUp className="w-3.5 h-3.5" />
@@ -223,7 +228,7 @@ export function MessageBubble({
                           "p-1 rounded transition-colors",
                           feedback === "down"
                             ? "text-red-400 bg-red-400/10"
-                            : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                            : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800"
                         )}
                       >
                         <ThumbsDown className="w-3.5 h-3.5" />
@@ -317,7 +322,7 @@ function FormattedMessage({ content }: { content: string }) {
             part.type === "inline-code" ? (
               <code
                 key={i}
-                className="px-1.5 py-0.5 rounded bg-muted text-primary text-xs font-mono"
+                className="px-1.5 py-0.5 rounded bg-zinc-800 text-violet-300 text-xs font-mono"
               >
                 {part.content}
               </code>
@@ -340,13 +345,13 @@ function FormattedMessage({ content }: { content: string }) {
       {parts.map((part, i) => {
         if (part.type === "code-block") {
           return (
-            <div key={i} className="my-2 rounded-lg overflow-hidden bg-card border border-border">
-              <div className="flex items-center justify-between px-3 py-1.5 bg-muted/50 border-b border-border">
-                <span className="text-xs text-muted-foreground font-mono">{part.language}</span>
+            <div key={i} className="my-2 rounded-lg overflow-hidden bg-zinc-900 border border-zinc-800">
+              <div className="flex items-center justify-between px-3 py-1.5 bg-zinc-800/50 border-b border-zinc-800">
+                <span className="text-xs text-zinc-500 font-mono">{part.language}</span>
                 <CopyCodeButton code={part.content} />
               </div>
               <pre className="p-3 overflow-x-auto">
-                <code className="text-xs font-mono text-foreground/80 leading-relaxed">
+                <code className="text-xs font-mono text-zinc-300 leading-relaxed">
                   {part.content}
                 </code>
               </pre>
@@ -376,7 +381,7 @@ function CopyCodeButton({ code }: { code: string }) {
   return (
     <button
       onClick={handleCopy}
-      className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+      className="p-1 rounded hover:bg-zinc-700 text-zinc-500 hover:text-zinc-300 transition-colors"
     >
       {copied ? (
         <Check className="w-3 h-3 text-green-400" />

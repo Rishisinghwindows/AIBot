@@ -47,7 +47,7 @@ class ToolAgent:
         self.drive_service = GoogleDriveService(settings, credential=self.credentials.get("google_drive"))
 
         slack_token = self.credentials.get("slack", {}).get("access_token")
-        self.slack_service = SlackService(settings, access_token=slack_token)
+        self.slack_service = SlackService(settings, token_override=slack_token)
 
         conf_creds = self.credentials.get("confluence", {})
         self.confluence_service = ConfluenceService(
@@ -60,9 +60,10 @@ class ToolAgent:
         jira_creds = self.credentials.get("jira", {})
         self.jira_service = JiraService(
             settings,
-            site_url=jira_creds.get("config", {}).get("base_url"),
-            access_token=jira_creds.get("access_token"),
-            cloud_id=jira_creds.get("config", {}).get("cloud_id"),
+            base_url=jira_creds.get("config", {}).get("base_url"),
+            email=jira_creds.get("config", {}).get("user"),
+            token=jira_creds.get("access_token"),
+            project_key=jira_creds.get("config", {}).get("project_key"),
         )
 
         self.web_crawl_service = WebCrawlService()
@@ -73,9 +74,9 @@ class ToolAgent:
         )
         github_creds = self.credentials.get("github", {})
         self.github_service = GitHubService(
-            settings,
-            access_token=github_creds.get("access_token"),
+            token=github_creds.get("access_token"),
             owner=github_creds.get("config", {}).get("owner"),
+            repo=github_creds.get("config", {}).get("repo"),
         )
 
         # Uber service
@@ -86,29 +87,21 @@ class ToolAgent:
 
         # D23Bot services
         self.astrology_service = get_astrology_service()
-        railway_api_key = getattr(settings, "railway_api_key", None)
+        railway_api_key = getattr(settings, "RAILWAY_API_KEY", None)
         self.travel_service = get_travel_service(railway_api_key)
-        news_api_key = getattr(settings, "news_api_key", None)
+        news_api_key = getattr(settings, "NEWS_API_KEY", None)
         self.news_service = get_news_service(news_api_key)
 
     def _build_tools(self):
         """Construct tool set and state for a single invocation."""
         last_tool: Dict[str, str] = {"name": RouterCategory.chat.value}
-        tool_data: Dict[str, Any] = {"structured_data": None, "intent": None}
         llm = self.llm
 
         @tool("weather", return_direct=True)
         async def weather_tool(city: str) -> str:
             """Get live weather for a city using OpenWeather."""
             last_tool["name"] = RouterCategory.weather.value
-            tool_data["intent"] = "weather"
             weather = await self.weather_service.get_weather(city)
-            tool_data["structured_data"] = {
-                "city": weather.city,
-                "temperature": weather.temperature_c,
-                "humidity": weather.humidity,
-                "condition": weather.condition,
-            }
             return (
                 f"Weather for {weather.city}: {weather.temperature_c}°C, "
                 f"humidity {weather.humidity}%, condition {weather.condition}."
@@ -471,13 +464,9 @@ class ToolAgent:
         async def news_tool(query: str = "", category: str = "") -> str:
             """Get latest news headlines. Optional query for search, category: business, sports, technology, entertainment."""
             last_tool["name"] = "news"
-            tool_data["intent"] = "get_news"
-            # Default to general category if no query or category provided
-            effective_category = category if category else ("general" if not query else None)
-            result = await self.news_service.get_news(query or None, effective_category, limit=5)
+            result = await self.news_service.get_news(query or None, category or None, limit=5)
             if result["success"]:
                 data = result["data"]
-                tool_data["structured_data"] = data
                 response = "*Latest News*\n"
                 if data.get('query'):
                     response += f"(Search: {data['query']})\n"
@@ -718,11 +707,11 @@ class ToolAgent:
             # General chat
             chat_tool,
         ]
-        return tools, last_tool, tool_data
+        return tools, last_tool
 
     def list_tools(self) -> List[Dict[str, str]]:
         """Return tool metadata for UI."""
-        tools, _, _ = self._build_tools()
+        tools, _ = self._build_tools()
         availability = {
             "slack_post": self.slack_service.available,
             "confluence_search": self.confluence_service.available,
@@ -758,7 +747,7 @@ class ToolAgent:
         """
         Run the agent with an optional subset of tools.
         """
-        tools, last_tool, tool_data = self._build_tools()
+        tools, last_tool = self._build_tools()
         tool_map = {t.name: t for t in tools}
 
         if allowed_tools:
@@ -793,8 +782,6 @@ class ToolAgent:
             "response": content or "No response",
             "category": last_tool["name"],
             "route_log": [last_tool["name"]],
-            "intent": tool_data.get("intent"),
-            "structured_data": tool_data.get("structured_data"),
         }
 
 

@@ -1,7 +1,6 @@
 "use client";
 
 import React from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -48,68 +47,68 @@ export function ChatHeader({
   const router = useRouter();
 
   return (
-    <header className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-border bg-background/80 backdrop-blur-xl">
+    <header className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-zinc-800 bg-black/50 backdrop-blur-xl">
       <div className="flex items-center gap-3">
         <Button
           variant="ghost"
           size="icon"
           onClick={onToggleSidebar}
-          className="h-9 w-9 text-muted-foreground hover:text-foreground hover:bg-accent"
+          className="h-9 w-9 text-zinc-400 hover:text-white hover:bg-zinc-800"
         >
           {sidebarOpen ? <PanelLeftClose className="h-5 w-5" /> : <PanelLeft className="h-5 w-5" />}
         </Button>
-        <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center">
-            <Sparkles className="h-4 w-4 text-primary-foreground" />
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center">
+            <Sparkles className="h-4 w-4 text-white" />
           </div>
-          <span className="font-semibold text-foreground">D23<span className="text-primary">.AI</span></span>
-        </Link>
+          <span className="font-semibold text-white">D23<span className="bg-gradient-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-transparent">.AI</span></span>
+        </div>
       </div>
 
       <div className="flex items-center gap-2">
         {isLoggedIn ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="gap-2 px-2 hover:bg-accent">
+              <Button variant="ghost" className="gap-2 px-2 hover:bg-zinc-800">
                 <Avatar className="h-7 w-7">
                   {userPhotoUrl && <AvatarImage src={userPhotoUrl} />}
-                  <AvatarFallback className="bg-primary text-primary-foreground text-xs">
+                  <AvatarFallback className="bg-gradient-to-br from-violet-600 to-fuchsia-600 text-white text-xs">
                     {userInitials}
                   </AvatarFallback>
                 </Avatar>
-                <ChevronDown className="h-4 w-4 opacity-60 text-muted-foreground" />
+                <ChevronDown className="h-4 w-4 opacity-60 text-zinc-400" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 bg-card border-border">
+            <DropdownMenuContent align="end" className="w-56 bg-zinc-900 border-zinc-800">
               <div className="px-2 py-1.5">
-                <p className="text-sm font-medium text-foreground">{userEmail}</p>
+                <p className="text-sm font-medium text-white">{userEmail}</p>
               </div>
-              <DropdownMenuSeparator className="bg-border" />
+              <DropdownMenuSeparator className="bg-zinc-800" />
               <DropdownMenuItem
                 onClick={() => router.push("/profile")}
-                className="text-muted-foreground focus:text-foreground focus:bg-accent"
+                className="text-zinc-300 focus:text-white focus:bg-zinc-800"
               >
                 <User className="mr-2 h-4 w-4" />
                 Profile
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => router.push("/knowledge-base")}
-                className="text-muted-foreground focus:text-foreground focus:bg-accent"
+                className="text-zinc-300 focus:text-white focus:bg-zinc-800"
               >
                 <BookOpen className="mr-2 h-4 w-4" />
                 Knowledge Base
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => router.push("/settings")}
-                className="text-muted-foreground focus:text-foreground focus:bg-accent"
+                className="text-zinc-300 focus:text-white focus:bg-zinc-800"
               >
                 <Settings className="mr-2 h-4 w-4" />
                 Integrations
               </DropdownMenuItem>
-              <DropdownMenuSeparator className="bg-border" />
+              <DropdownMenuSeparator className="bg-zinc-800" />
               <DropdownMenuItem
                 onClick={onLogout}
-                className="text-destructive focus:text-destructive focus:bg-accent"
+                className="text-red-400 focus:text-red-300 focus:bg-zinc-800"
               >
                 <LogOut className="mr-2 h-4 w-4" />
                 Sign out
@@ -120,7 +119,7 @@ export function ChatHeader({
           <Button
             onClick={onLogin}
             variant="ghost"
-            className="gap-2 text-muted-foreground hover:text-foreground hover:bg-accent"
+            className="gap-2 text-zinc-300 hover:text-white hover:bg-zinc-800"
           >
             <LogIn className="h-4 w-4" />
             Sign in

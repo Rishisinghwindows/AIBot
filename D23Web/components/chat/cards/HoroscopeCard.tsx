@@ -48,7 +48,7 @@ const zodiacColors: Record<string, string> = {
   libra: "from-pink-500/20 to-rose-500/10",
   scorpio: "from-purple-500/20 to-violet-500/10",
   sagittarius: "from-indigo-500/20 to-blue-500/10",
-  capricorn: "from-muted/50 to-muted/20",
+  capricorn: "from-zinc-500/20 to-slate-500/10",
   aquarius: "from-cyan-500/20 to-blue-500/10",
   pisces: "from-violet-500/20 to-purple-500/10",
 };
@@ -62,14 +62,14 @@ export function HoroscopeCard({ data }: HoroscopeCardProps) {
   const dateText = data.date || data.period || "Today";
 
   return (
-    <Card className="bg-card border-border overflow-hidden">
-      <CardHeader className={`pb-3 bg-gradient-to-r ${gradient} border-b border-border`}>
+    <Card className="bg-gradient-to-br from-zinc-900 to-zinc-950 border-zinc-800 overflow-hidden">
+      <CardHeader className={`pb-3 bg-gradient-to-r ${gradient} border-b border-zinc-800`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="text-4xl">{emoji}</div>
             <div>
-              <h3 className="text-lg font-bold text-foreground capitalize">{zodiacSign}</h3>
-              <p className="text-sm text-muted-foreground capitalize">{dateText}</p>
+              <h3 className="text-lg font-bold text-white capitalize">{zodiacSign}</h3>
+              <p className="text-sm text-zinc-400 capitalize">{dateText}</p>
             </div>
           </div>
           <Sparkles className="h-6 w-6 text-yellow-400" />
@@ -78,26 +78,26 @@ export function HoroscopeCard({ data }: HoroscopeCardProps) {
 
       <CardContent className="pt-4 space-y-4">
         {/* Daily Horoscope */}
-        <div className="p-3 rounded-lg bg-muted/30 border border-border">
+        <div className="p-3 rounded-lg bg-zinc-800/30 border border-zinc-700/50">
           <div className="flex items-center gap-2 mb-2">
             <Star className="h-4 w-4 text-yellow-400" />
-            <span className="text-sm font-medium text-foreground">Today's Reading</span>
+            <span className="text-sm font-medium text-zinc-300">Today's Reading</span>
           </div>
-          <p className="text-sm text-muted-foreground leading-relaxed">{horoscopeText}</p>
+          <p className="text-sm text-zinc-400 leading-relaxed">{horoscopeText}</p>
         </div>
 
         {/* Lucky Elements */}
         <div className="grid grid-cols-2 gap-3">
           {data.lucky_number && (
-            <div className="p-3 rounded-lg bg-muted/50 border border-border text-center">
-              <p className="text-xs text-muted-foreground mb-1">Lucky Number</p>
-              <p className="text-2xl font-bold text-primary">{data.lucky_number}</p>
+            <div className="p-3 rounded-lg bg-zinc-800/50 border border-zinc-700/50 text-center">
+              <p className="text-xs text-zinc-500 mb-1">Lucky Number</p>
+              <p className="text-2xl font-bold text-violet-400">{data.lucky_number}</p>
             </div>
           )}
           {data.lucky_color && (
-            <div className="p-3 rounded-lg bg-muted/50 border border-border text-center">
-              <p className="text-xs text-muted-foreground mb-1">Lucky Color</p>
-              <Badge variant="outline" className="bg-muted/50 text-foreground border-border">
+            <div className="p-3 rounded-lg bg-zinc-800/50 border border-zinc-700/50 text-center">
+              <p className="text-xs text-zinc-500 mb-1">Lucky Color</p>
+              <Badge variant="outline" className="bg-zinc-700/50 text-white border-zinc-600">
                 {data.lucky_color}
               </Badge>
             </div>
@@ -106,23 +106,23 @@ export function HoroscopeCard({ data }: HoroscopeCardProps) {
 
         {/* Mood, Focus Area & Compatibility */}
         {(data.mood || data.compatibility || data.focus_area) && (
-          <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-border">
+          <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-zinc-800">
             {data.mood && (
               <div className="flex items-center gap-2">
-                <Moon className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">Mood: <span className="text-foreground capitalize">{data.mood}</span></span>
+                <Moon className="h-4 w-4 text-zinc-500" />
+                <span className="text-sm text-zinc-400">Mood: <span className="text-white capitalize">{data.mood}</span></span>
               </div>
             )}
             {data.focus_area && (
               <div className="flex items-center gap-2">
-                <Star className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">Focus: <span className="text-foreground capitalize">{data.focus_area}</span></span>
+                <Star className="h-4 w-4 text-zinc-500" />
+                <span className="text-sm text-zinc-400">Focus: <span className="text-white capitalize">{data.focus_area}</span></span>
               </div>
             )}
             {data.compatibility && (
               <div className="flex items-center gap-2">
-                <Sun className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">Best match: <span className="text-foreground">{data.compatibility}</span></span>
+                <Sun className="h-4 w-4 text-zinc-500" />
+                <span className="text-sm text-zinc-400">Best match: <span className="text-white">{data.compatibility}</span></span>
               </div>
             )}
           </div>
@@ -130,10 +130,10 @@ export function HoroscopeCard({ data }: HoroscopeCardProps) {
 
         {/* Advice */}
         {data.advice && (
-          <div className="p-3 rounded-lg bg-primary/10 border border-primary/20">
+          <div className="p-3 rounded-lg bg-violet-500/10 border border-violet-500/20">
             <div className="flex items-start gap-2">
-              <Sun className="h-4 w-4 text-primary mt-0.5" />
-              <p className="text-sm text-foreground/80">{data.advice}</p>
+              <Sun className="h-4 w-4 text-violet-400 mt-0.5" />
+              <p className="text-sm text-zinc-300">{data.advice}</p>
             </div>
           </div>
         )}

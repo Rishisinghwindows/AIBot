@@ -185,19 +185,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
         error_message=str(exc),
     )
 
-    settings = get_settings()
-    # In development, include error details for debugging
-    if settings.environment != "production":
-        return JSONResponse(
-            status_code=500,
-            content={
-                "error": "INTERNAL_ERROR",
-                "message": str(exc),
-                "details": {"type": type(exc).__name__, "path": request.url.path},
-            },
-        )
-
-    # Return a generic error to the client in production
+    # Return a generic error to the client (don't expose internal details)
     return JSONResponse(
         status_code=500,
         content={

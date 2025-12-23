@@ -46,44 +46,6 @@ type UserLocation = {
   accuracy?: number;
 };
 
-const parseStructuredData = (value: unknown): Record<string, unknown> | undefined => {
-  if (!value) return undefined;
-  if (typeof value === "string") {
-    try {
-      return JSON.parse(value);
-    } catch {
-      return undefined;
-    }
-  }
-  if (typeof value === "object") {
-    return value as Record<string, unknown>;
-  }
-  return undefined;
-};
-
-const normalizeMessage = (msg: any): ChatMessage => {
-  const metadata = msg.message_metadata || msg.metadata || {};
-  const structuredData =
-    parseStructuredData(
-      msg.structured_data ??
-      metadata.structured_data ??
-      metadata.structuredData ??
-      metadata.structured_data_json ??
-      metadata.structuredDataJson
-    );
-
-  return {
-    id: msg.id ?? crypto.randomUUID(),
-    conversation_id: msg.conversation_id ?? msg.conversationId ?? null,
-    role: msg.role ?? "assistant",
-    content: msg.content ?? msg.message ?? "",
-    created_at: msg.created_at ?? msg.timestamp ?? new Date().toISOString(),
-    media_url: msg.media_url ?? metadata.media_url ?? metadata.mediaUrl,
-    intent: msg.intent ?? metadata.intent,
-    structured_data: structuredData,
-  };
-};
-
 export default function ChatPage() {
   const { currentUser, currentProfile, loading, accessToken, login, logout } = useAuth();
   const router = useRouter();
@@ -140,33 +102,40 @@ export default function ChatPage() {
     { icon: Calendar, label: "Panchang", prompt: "What's today's panchang?", color: "text-amber-400" },
   ];
 
-  // Auto-scroll to bottom when new messages arrive
+  // Scroll handling
   useEffect(() => {
-    // Use scrollIntoView on the end ref - most reliable method
-    const timeoutId = setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, 100);
-    return () => clearTimeout(timeoutId);
-  }, [messages, currentAIMessage]);
+    const viewport = chatAreaRef.current?.querySelector("[data-radix-scroll-area-viewport]") as HTMLDivElement | null;
+    if (!viewport) return;
 
-  // Track scroll position for showing/hiding scroll button
+    const scrollHeight = viewport.scrollHeight;
+    const shouldStick = isScrolledToBottom || scrollHeight - viewport.scrollTop - viewport.clientHeight < 200;
+    if (shouldStick) {
+      viewport.scrollTo({ top: scrollHeight, behavior: "smooth" });
+      setIsScrolledToBottom(true);
+    }
+  }, [messages, currentAIMessage, isScrolledToBottom]);
+
   useEffect(() => {
-    const container = chatAreaRef.current;
-    if (!container) return;
+    const viewport = chatAreaRef.current?.querySelector("[data-radix-scroll-area-viewport]") as HTMLDivElement | null;
+    if (!viewport) return;
 
     const handleScroll = () => {
-      const atBottom = container.scrollHeight - container.scrollTop - container.clientHeight <= 100;
+      const atBottom = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight <= 48;
       setIsScrolledToBottom(atBottom);
     };
 
-    container.addEventListener("scroll", handleScroll);
+    viewport.addEventListener("scroll", handleScroll);
     handleScroll();
-    return () => container.removeEventListener("scroll", handleScroll);
+    return () => viewport.removeEventListener("scroll", handleScroll);
   }, []);
 
   const scrollToBottom = () => {
+    const viewport = chatAreaRef.current?.querySelector("[data-radix-scroll-area-viewport]") as HTMLDivElement | null;
+    if (viewport) {
+      viewport.scrollTo({ top: viewport.scrollHeight, behavior: "smooth" });
+      setIsScrolledToBottom(true);
+    }
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    setIsScrolledToBottom(true);
   };
 
   // Auto-resize textarea
@@ -220,13 +189,12 @@ export default function ChatPage() {
       if (!accessToken || !currentConversationId) return;
       setIsFetchingMessages(true);
       try {
-      const response = await fetch(`${apiBase}/chat/history?conversation_id=${currentConversationId}`, {
+        const response = await fetch(`${apiBase}/chat/history?conversation_id=${currentConversationId}`, {
           headers: { Authorization: `Bearer ${accessToken}` },
         });
         if (!response.ok) throw new Error("Failed to fetch messages");
         const data = await response.json();
-        const formatted = (data.messages || []).map((msg: unknown) => normalizeMessage(msg));
-        setMessages(formatted);
+        setMessages(data.messages || []);
       } catch (error) {
         console.error("Error fetching messages:", error);
       } finally {
@@ -317,7 +285,16 @@ export default function ChatPage() {
           console.log("[History] Loaded messages:", data.messages?.length || 0);
           setWebSessionId(storedSessionId);
           if (data.messages && data.messages.length > 0) {
-            const formattedMessages = data.messages.map((msg: unknown) => normalizeMessage({ ...msg, conversation_id: "anonymous" }));
+            const formattedMessages = data.messages.map((msg: { id: string; role: string; content: string; timestamp: string; media_url?: string; intent?: string; structured_data?: Record<string, unknown> }) => ({
+              id: msg.id,
+              conversation_id: "anonymous",
+              role: msg.role,
+              content: msg.content,
+              created_at: msg.timestamp,
+              media_url: msg.media_url,
+              intent: msg.intent,
+              structured_data: msg.structured_data,
+            }));
             setMessages(formattedMessages);
           }
         } else {
@@ -401,40 +378,6 @@ export default function ChatPage() {
         let aiFullResponse = "";
         let partialLine = "";
         let mediaUrl: string | undefined;
-        let intent: string | undefined;
-        let structuredData: Record<string, unknown> | undefined;
-
-        const hydrateFromMetadata = (source: unknown) => {
-          if (!source) return;
-          let metadata: Record<string, unknown> | undefined;
-          if (typeof source === "string") {
-            try {
-              metadata = JSON.parse(source);
-            } catch {
-              return;
-            }
-          } else if (typeof source === "object") {
-            metadata = source as Record<string, unknown>;
-          }
-          if (!metadata) return;
-
-          if (!mediaUrl && typeof metadata.media_url === "string") {
-            mediaUrl = metadata.media_url;
-          } else if (!mediaUrl && typeof metadata.mediaUrl === "string") {
-            mediaUrl = metadata.mediaUrl;
-          }
-          if (!intent && typeof metadata.intent === "string") {
-            intent = metadata.intent;
-          }
-          if (!structuredData) {
-            structuredData = parseStructuredData(
-              metadata.structured_data ??
-              metadata.structuredData ??
-              metadata.structured_data_json ??
-              metadata.structuredDataJson
-            );
-          }
-        };
 
         while (true) {
           const { done, value } = await reader.read();
@@ -461,14 +404,6 @@ export default function ChatPage() {
                 if (parsed.media_url) {
                   mediaUrl = parsed.media_url;
                 }
-                if (parsed.intent) {
-                  intent = parsed.intent;
-                }
-                if (parsed.structured_data) {
-                  structuredData = parseStructuredData(parsed.structured_data);
-                }
-                if (parsed.message_metadata) hydrateFromMetadata(parsed.message_metadata);
-                if (parsed.metadata) hydrateFromMetadata(parsed.metadata);
               } catch {
                 // Not valid JSON, skip
               }
@@ -478,96 +413,64 @@ export default function ChatPage() {
           if (done) break;
         }
 
-        const aiMessage = normalizeMessage({
+        const aiMessage: ChatMessage = {
           id: crypto.randomUUID(),
           conversation_id: actualConversationId,
           role: "assistant",
           content: aiFullResponse,
           created_at: new Date().toISOString(),
           media_url: mediaUrl,
-          intent: intent,
-          structured_data: structuredData,
-        });
+        };
         setMessages((prev) => [...prev, aiMessage]);
         setCurrentAIMessage("");
       } else {
-        // Anonymous chat flow using /chat/ask with session_id
+        // Anonymous chat flow using web session
         const sessionId = await getWebSession();
 
-        const response = await fetch(`${apiBase}/chat/ask`, {
+        // Build request body with optional location
+        const requestBody: Record<string, unknown> = {
+          message: userMessage.content,
+          session_id: sessionId,
+        };
+
+        // Include location if available
+        if (userLocation) {
+          requestBody.location = {
+            latitude: userLocation.latitude,
+            longitude: userLocation.longitude,
+            accuracy: userLocation.accuracy,
+          };
+        }
+
+        const response = await fetch(`${apiBase}/web/chat`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            message: userMessage.content,
-            session_id: sessionId,
-          }),
+          body: JSON.stringify(requestBody),
         });
 
-        if (!response.ok || !response.body) {
+        if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        // Use same SSE streaming as authenticated flow
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder("utf-8");
-        let aiFullResponse = "";
-        let partialLine = "";
-        let mediaUrl: string | undefined;
-        let intent: string | undefined;
-        let structuredData: Record<string, unknown> | undefined;
+        const data = await response.json();
 
-        while (true) {
-          const { done, value } = await reader.read();
-          partialLine += decoder.decode(value || new Uint8Array(), { stream: !done });
-
-          const lines = partialLine.split("\n");
-          partialLine = lines.pop() || "";
-
-          for (const line of lines) {
-            if (line.startsWith("event:")) {
-              continue;
-            }
-            if (line.startsWith("data:")) {
-              const data = line.replace(/^data:\s*/, "").trim();
-              if (!data) continue;
-
-              try {
-                const parsed = JSON.parse(data);
-
-                if (parsed.content) {
-                  setCurrentAIMessage((prev) => prev + parsed.content);
-                  aiFullResponse += parsed.content;
-                }
-                if (parsed.media_url) {
-                  mediaUrl = parsed.media_url;
-                }
-                if (parsed.intent) {
-                  intent = parsed.intent;
-                }
-                if (parsed.structured_data) {
-                  structuredData = parseStructuredData(parsed.structured_data);
-                }
-              } catch {
-                // Not valid JSON, skip
-              }
-            }
-          }
-
-          if (done) break;
-        }
-
-        const aiMessage = normalizeMessage({
-          id: crypto.randomUUID(),
+        const aiMessage: ChatMessage = {
+          id: data.assistant_message?.id || crypto.randomUUID(),
           conversation_id: "anonymous",
           role: "assistant",
-          content: aiFullResponse,
+          content: data.assistant_message?.content || data.response || "No response",
           created_at: new Date().toISOString(),
-          media_url: mediaUrl,
-          intent: intent,
-          structured_data: structuredData,
-        });
+          media_url: data.assistant_message?.media_url,
+          intent: data.assistant_message?.intent,
+          structured_data: data.assistant_message?.structured_data,
+        };
         setMessages((prev) => [...prev, aiMessage]);
-        setCurrentAIMessage("");
+
+        // Check if location is required for this query
+        if (data.requires_location && !userLocation) {
+          setPendingLocationMessage(userMessage.content);
+          setShowLocationPrompt(true);
+        }
       }
     } catch (error) {
       console.error("Error sending message:", error);
@@ -841,7 +744,16 @@ export default function ChatPage() {
       if (response.ok) {
         const data = await response.json();
         if (data.messages && data.messages.length > 0) {
-          const formattedMessages = data.messages.map((msg: unknown) => normalizeMessage({ ...msg, conversation_id: conversationId }));
+          const formattedMessages = data.messages.map((msg: { id: string; role: string; content: string; timestamp: string; media_url?: string; intent?: string; structured_data?: Record<string, unknown> }) => ({
+            id: msg.id,
+            conversation_id: conversationId,
+            role: msg.role,
+            content: msg.content,
+            created_at: msg.timestamp,
+            media_url: msg.media_url,
+            intent: msg.intent,
+            structured_data: msg.structured_data,
+          }));
           setMessages(formattedMessages);
           setWebSessionId(conversationId);
           localStorage.setItem("ohgrt_session_id", conversationId);
@@ -957,7 +869,7 @@ export default function ChatPage() {
           messages={messages}
           currentAIMessage={currentAIMessage}
           isFetchingMessages={isFetchingMessages}
-          isSending={isSending}
+          userInitials={userInitials}
           inputRef={inputRef}
           chatAreaRef={chatAreaRef}
           messagesEndRef={messagesEndRef}
@@ -970,7 +882,7 @@ export default function ChatPage() {
 
         {/* Input Area */}
         <div className="flex-shrink-0 border-t border-zinc-800 p-4 bg-black/50 backdrop-blur-xl">
-          <div className="max-w-6xl w-full mx-auto space-y-3 px-1 sm:px-2">
+          <div className="max-w-3xl mx-auto space-y-3">
             {/* Location Prompt */}
             {showLocationPrompt && (
               <LocationPrompt

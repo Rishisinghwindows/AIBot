@@ -46,7 +46,7 @@ const suitIcons: Record<string, React.ReactNode> = {
 
 const positionColors: Record<string, string> = {
   past: "from-blue-500/20 to-cyan-500/10",
-  present: "from-primary/20 to-primary/10",
+  present: "from-violet-500/20 to-purple-500/10",
   future: "from-amber-500/20 to-yellow-500/10",
 };
 
@@ -58,16 +58,16 @@ export function TarotCard({ data, topic }: TarotCardProps) {
   // Handle multi-card spread
   if (isSpread(data)) {
     return (
-      <Card className="bg-card border-border overflow-hidden">
-        <CardHeader className="pb-3 bg-gradient-to-r from-primary/10 to-primary/5 border-b border-border">
+      <Card className="bg-gradient-to-br from-zinc-900 to-zinc-950 border-zinc-800 overflow-hidden">
+        <CardHeader className="pb-3 bg-gradient-to-r from-violet-500/10 to-purple-500/10 border-b border-zinc-800">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center">
-                <Sparkles className="h-5 w-5 text-primary-foreground" />
+              <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center">
+                <Sparkles className="h-5 w-5 text-white" />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-foreground">Tarot Reading</h3>
-                <p className="text-sm text-muted-foreground capitalize">
+                <h3 className="text-lg font-bold text-white">Tarot Reading</h3>
+                <p className="text-sm text-zinc-400 capitalize">
                   {data.spread_type?.replace('_', ' ') || 'Three Card Spread'}
                 </p>
               </div>
@@ -78,9 +78,9 @@ export function TarotCard({ data, topic }: TarotCardProps) {
         <CardContent className="pt-4 space-y-4">
           {/* Question if provided */}
           {(data.question || topic) && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <div className="flex items-center gap-2 text-sm text-zinc-400">
               <HelpCircle className="h-4 w-4" />
-              <span>Reading for: <span className="text-foreground">{data.question || topic}</span></span>
+              <span>Reading for: <span className="text-white">{data.question || topic}</span></span>
             </div>
           )}
 
@@ -88,23 +88,23 @@ export function TarotCard({ data, topic }: TarotCardProps) {
           <div className="grid grid-cols-3 gap-3">
             {data.cards.map((card, idx) => {
               const posLower = card.position.toLowerCase();
-              const gradient = positionColors[posLower] || "from-muted/50 to-muted/20";
+              const gradient = positionColors[posLower] || "from-zinc-500/20 to-zinc-400/10";
 
               return (
                 <div
                   key={idx}
-                  className={`p-3 rounded-lg bg-gradient-to-br ${gradient} border border-border`}
+                  className={`p-3 rounded-lg bg-gradient-to-br ${gradient} border border-zinc-700/50`}
                 >
                   <div className="text-center">
-                    <p className="text-xs text-muted-foreground mb-1">{card.position}</p>
-                    <p className="text-sm font-bold text-foreground mb-1">{card.card}</p>
+                    <p className="text-xs text-zinc-500 mb-1">{card.position}</p>
+                    <p className="text-sm font-bold text-white mb-1">{card.card}</p>
                     {card.reversed && (
                       <Badge variant="outline" className="text-xs bg-purple-500/20 text-purple-400 border-purple-500/30 mb-1">
                         <RotateCcw className="h-3 w-3 mr-1" />
                         Reversed
                       </Badge>
                     )}
-                    <p className="text-xs text-muted-foreground mt-1">{card.meaning}</p>
+                    <p className="text-xs text-zinc-400 mt-1">{card.meaning}</p>
                   </div>
                 </div>
               );
@@ -112,12 +112,12 @@ export function TarotCard({ data, topic }: TarotCardProps) {
           </div>
 
           {/* Interpretation */}
-          <div className="p-3 rounded-lg bg-primary/10 border border-primary/20">
+          <div className="p-3 rounded-lg bg-violet-500/10 border border-violet-500/20">
             <div className="flex items-center gap-2 mb-2">
-              <Sparkles className="h-4 w-4 text-primary" />
-              <span className="text-sm font-medium text-primary">Interpretation</span>
+              <Sparkles className="h-4 w-4 text-violet-400" />
+              <span className="text-sm font-medium text-violet-300">Interpretation</span>
             </div>
-            <p className="text-sm text-foreground/80 leading-relaxed">{data.interpretation}</p>
+            <p className="text-sm text-zinc-300 leading-relaxed">{data.interpretation}</p>
           </div>
         </CardContent>
       </Card>
@@ -131,19 +131,19 @@ export function TarotCard({ data, topic }: TarotCardProps) {
        singleCard.suit.toLowerCase() === 'wands' ? 'from-orange-500/20 to-amber-500/10' :
        singleCard.suit.toLowerCase() === 'swords' ? 'from-blue-500/20 to-cyan-500/10' :
        'from-yellow-500/20 to-amber-500/10')
-    : 'from-primary/20 to-primary/10';
-  const icon = singleCard.suit ? suitIcons[singleCard.suit.toLowerCase()] : <Sparkles className="h-5 w-5 text-primary" />;
+    : 'from-violet-500/20 to-purple-500/10';
+  const icon = singleCard.suit ? suitIcons[singleCard.suit.toLowerCase()] : <Sparkles className="h-5 w-5 text-violet-400" />;
 
   return (
-    <Card className="bg-card border-border overflow-hidden">
-      <CardHeader className={`pb-3 bg-gradient-to-r ${gradient} border-b border-border`}>
+    <Card className="bg-gradient-to-br from-zinc-900 to-zinc-950 border-zinc-800 overflow-hidden">
+      <CardHeader className={`pb-3 bg-gradient-to-r ${gradient} border-b border-zinc-800`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center">
+            <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center">
               {icon}
             </div>
             <div>
-              <h3 className="text-lg font-bold text-foreground">{singleCard.card_name}</h3>
+              <h3 className="text-lg font-bold text-white">{singleCard.card_name}</h3>
               <div className="flex items-center gap-2 mt-1">
                 <Badge
                   variant="outline"
@@ -155,7 +155,7 @@ export function TarotCard({ data, topic }: TarotCardProps) {
                   {singleCard.position === "upright" ? "↑ Upright" : "↓ Reversed"}
                 </Badge>
                 {singleCard.card_type === "major" && (
-                  <Badge variant="outline" className="bg-primary/20 text-primary border-primary/30">
+                  <Badge variant="outline" className="bg-violet-500/20 text-violet-300 border-violet-500/30">
                     Major Arcana
                   </Badge>
                 )}
@@ -167,44 +167,44 @@ export function TarotCard({ data, topic }: TarotCardProps) {
 
       <CardContent className="pt-4 space-y-4">
         {topic && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <div className="flex items-center gap-2 text-sm text-zinc-400">
             <HelpCircle className="h-4 w-4" />
-            <span>Reading for: <span className="text-foreground">{topic}</span></span>
+            <span>Reading for: <span className="text-white">{topic}</span></span>
           </div>
         )}
 
         {/* Card Meaning */}
-        <div className="p-3 rounded-lg bg-muted/30 border border-border">
+        <div className="p-3 rounded-lg bg-zinc-800/30 border border-zinc-700/50">
           <div className="flex items-center gap-2 mb-2">
             <Star className="h-4 w-4 text-yellow-400" />
-            <span className="text-sm font-medium text-foreground">
+            <span className="text-sm font-medium text-zinc-300">
               {singleCard.position === "upright" ? "Upright Meaning" : "Reversed Meaning"}
             </span>
           </div>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-zinc-400">
             {singleCard.position === "upright" ? singleCard.meaning_upright : singleCard.meaning_reversed}
           </p>
         </div>
 
         {/* Interpretation */}
         {singleCard.interpretation && (
-          <div className="p-3 rounded-lg bg-primary/10 border border-primary/20">
+          <div className="p-3 rounded-lg bg-violet-500/10 border border-violet-500/20">
             <div className="flex items-center gap-2 mb-2">
-              <Sparkles className="h-4 w-4 text-primary" />
-              <span className="text-sm font-medium text-primary">Your Interpretation</span>
+              <Sparkles className="h-4 w-4 text-violet-400" />
+              <span className="text-sm font-medium text-violet-300">Your Interpretation</span>
             </div>
-            <p className="text-sm text-foreground/80 leading-relaxed">{singleCard.interpretation}</p>
+            <p className="text-sm text-zinc-300 leading-relaxed">{singleCard.interpretation}</p>
           </div>
         )}
 
         {/* Advice */}
         {singleCard.advice && (
-          <div className="pt-3 border-t border-border">
+          <div className="pt-3 border-t border-zinc-800">
             <div className="flex items-start gap-2">
               <Sun className="h-4 w-4 text-yellow-400 mt-0.5" />
               <div>
-                <span className="text-sm font-medium text-foreground">Advice: </span>
-                <span className="text-sm text-muted-foreground">{singleCard.advice}</span>
+                <span className="text-sm font-medium text-zinc-300">Advice: </span>
+                <span className="text-sm text-zinc-400">{singleCard.advice}</span>
               </div>
             </div>
           </div>

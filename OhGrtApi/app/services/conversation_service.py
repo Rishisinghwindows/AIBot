@@ -1,26 +1,31 @@
+"""
+Conversation Service - Manages user chat conversations and messages.
+"""
+
 from __future__ import annotations
 
-from typing import Optional
+from typing import List, Optional
 from uuid import UUID
 
 from sqlalchemy.orm import Session
 
-from app.db.models import Conversation
+from app.db.models import Conversation, ChatMessage
 from app.logger import logger
 
 
 class ConversationService:
-    """Service for managing conversations using SQLAlchemy."""
+    """Service for managing user conversations."""
 
     def __init__(self, db: Session):
         self.db = db
 
-    def get_conversations_by_user(self, user_id: UUID) -> list[Conversation]:
-        """Get all conversations for a user."""
+    def get_conversations_by_user(self, user_id: UUID, limit: int = 50) -> List[Conversation]:
+        """Get all conversations for a user, ordered by most recent."""
         return (
             self.db.query(Conversation)
             .filter(Conversation.user_id == user_id)
             .order_by(Conversation.updated_at.desc())
+            .limit(limit)
             .all()
         )
 
@@ -50,7 +55,7 @@ class ConversationService:
         user_id: UUID,
         title: Optional[str] = None,
     ) -> Optional[Conversation]:
-        """Update a conversation."""
+        """Update an existing conversation."""
         conversation = self.get_conversation(conversation_id, user_id)
         if not conversation:
             return None
@@ -60,16 +65,71 @@ class ConversationService:
 
         self.db.commit()
         self.db.refresh(conversation)
-        logger.info("conversation_updated", conversation_id=str(conversation_id), user_id=str(user_id))
+        logger.info("conversation_updated", conversation_id=str(conversation.id), user_id=str(user_id))
         return conversation
 
     def delete_conversation(self, conversation_id: UUID, user_id: UUID) -> bool:
-        """Delete a conversation."""
+        """Delete a conversation and all its messages."""
+        # Delete messages first (cascade should handle this, but being explicit)
+        self.db.query(ChatMessage).filter(
+            ChatMessage.conversation_id == conversation_id,
+            ChatMessage.user_id == user_id,
+        ).delete()
+
+        deleted = (
+            self.db.query(Conversation)
+            .filter(Conversation.id == conversation_id, Conversation.user_id == user_id)
+            .delete()
+        )
+        self.db.commit()
+        if deleted:
+            logger.info("conversation_deleted", conversation_id=str(conversation_id), user_id=str(user_id))
+        return deleted > 0
+
+    def get_messages(
+        self,
+        conversation_id: UUID,
+        user_id: UUID,
+        limit: int = 100,
+    ) -> List[ChatMessage]:
+        """Get messages for a conversation."""
+        # Verify the conversation belongs to the user
         conversation = self.get_conversation(conversation_id, user_id)
         if not conversation:
-            return False
+            return []
 
-        self.db.delete(conversation)
+        return (
+            self.db.query(ChatMessage)
+            .filter(ChatMessage.conversation_id == conversation_id)
+            .order_by(ChatMessage.created_at.asc())
+            .limit(limit)
+            .all()
+        )
+
+    def add_message(
+        self,
+        conversation_id: UUID,
+        user_id: UUID,
+        role: str,
+        content: str,
+        metadata: Optional[dict] = None,
+    ) -> ChatMessage:
+        """Add a message to a conversation."""
+        message = ChatMessage(
+            user_id=user_id,
+            conversation_id=conversation_id,
+            role=role,
+            content=content,
+            message_metadata=metadata or {},
+        )
+        self.db.add(message)
+
+        # Update conversation's updated_at
+        conversation = self.get_conversation(conversation_id, user_id)
+        if conversation:
+            from datetime import datetime, timezone
+            conversation.updated_at = datetime.now(timezone.utc)
+
         self.db.commit()
-        logger.info("conversation_deleted", conversation_id=str(conversation_id), user_id=str(user_id))
-        return True
+        self.db.refresh(message)
+        return message

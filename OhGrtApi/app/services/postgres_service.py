@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Optional
 import json
 
 import psycopg2
 from langchain_core.prompts import ChatPromptTemplate
 
 from app.config import Settings
+from app.exceptions import SQLInjectionError, ValidationError, DatabaseError, ExternalServiceError
 from app.logger import logger
-from app.utils.errors import ServiceError, ValidationError
 from app.utils.llm import build_chat_llm
 
 
@@ -16,8 +16,17 @@ class PostgresService:
     def __init__(self, settings: Settings):
         self.settings = settings
         self.llm = build_chat_llm(settings)
-        self.schema_info = None
-        self.prompt = None
+        self.schema_info = self._load_schema_info()
+        self.prompt = ChatPromptTemplate.from_template(
+            """You are a SQL expert. Given a user question and the database schema, produce a single safe SQL query.
+Avoid destructive commands (DROP, DELETE, TRUNCATE, ALTER). Only return SQL, nothing else.
+
+Schema:
+{schema}
+
+Question: {question}
+SQL:"""
+        )
 
     def _conn_kwargs(self) -> dict:
         return {
@@ -27,29 +36,8 @@ class PostgresService:
             "password": self.settings.postgres_password,
             "dbname": self.settings.postgres_db,
         }
-    
-    def execute_query(self, query: str, params: Optional[tuple] = None) -> List[Dict[str, Any]]:
-        """
-        Execute a SQL query and return the results as a list of dictionaries.
-        """
-        logger.info("postgres_service_execute_query", query=query, params=params)
-        try:
-            with psycopg2.connect(**self._conn_kwargs()) as conn:
-                with conn.cursor() as cur:
-                    cur.execute(f"SET search_path TO {self.settings.postgres_schema};")
-                    cur.execute(query, params)
-                    if cur.description:
-                        col_names = [desc[0] for desc in cur.description]
-                        rows = cur.fetchall()
-                        return [dict(zip(col_names, row)) for row in rows]
-                    return []
-        except Exception as exc:
-            logger.error("sql_error", error=str(exc))
-            raise ServiceError("SQL execution failed") from exc
 
     def _load_schema_info(self) -> str:
-        if self.schema_info:
-            return self.schema_info
         try:
             with psycopg2.connect(**self._conn_kwargs()) as conn:
                 with conn.cursor() as cur:
@@ -65,7 +53,7 @@ class PostgresService:
                     rows = cur.fetchall()
         except Exception as exc:  # noqa: BLE001
             logger.error("sql_schema_load_error", error=str(exc))
-            raise ServiceError("Failed to load database schema") from exc
+            raise DatabaseError("Failed to load database schema", operation="load_schema") from exc
 
         schema_lines = []
         current_table = None
@@ -80,8 +68,7 @@ class PostgresService:
                 cols.append(f"{col} {dtype}")
         if current_table:
             schema_lines.append(f"Table {current_table}({', '.join(cols)})")
-        self.schema_info = "\n".join(schema_lines) if schema_lines else ""
-        return self.schema_info
+        return "\n".join(schema_lines) if schema_lines else ""
 
     def _validate_question(self, question: str) -> None:
         forbidden = ["drop", "delete", "truncate", "alter"]
@@ -90,19 +77,8 @@ class PostgresService:
             raise ValidationError("Destructive SQL operations are not allowed")
 
     def _generate_sql(self, question: str) -> str:
-        if not self.prompt:
-            self.prompt = ChatPromptTemplate.from_template(
-            """You are a SQL expert. Given a user question and the database schema, produce a single safe SQL query.
-Avoid destructive commands (DROP, DELETE, TRUNCATE, ALTER). Only return SQL, nothing else.
-
-Schema:
-{schema}
-
-Question: {question}
-SQL:"""
-        )
         messages = self.prompt.format_messages(
-            schema=self._load_schema_info(), question=question
+            schema=self.schema_info, question=question
         )
         result = self.llm.invoke(messages)
         return result.content.replace("```", "").replace("sql", "", 1).strip().strip("`")
@@ -117,6 +93,18 @@ SQL:"""
         rewritten = rewritten.replace("CURDATE()", "CURRENT_DATE")
         return rewritten
 
+    def _validate_schema_name(self, schema: str) -> str:
+        """
+        Validate and sanitize schema name to prevent SQL injection.
+
+        Only allows alphanumeric characters and underscores.
+        """
+        import re
+        if not re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', schema):
+            raise SQLInjectionError(f"Invalid schema name: {schema}")
+        # Use PostgreSQL identifier quoting for safety
+        return f'"{schema}"'
+
     def _validate_sql(self, sql: str) -> None:
         normalized = sql.replace("\n", " ").strip()
         # Allow a single trailing semicolon but forbid multiple statements.
@@ -128,9 +116,9 @@ SQL:"""
         lowered = parts[0].lower()
         if not lowered.startswith("select"):
             raise ValidationError("Only SELECT queries are allowed")
-        forbidden = ["insert", "update", "delete", "drop", "alter", "truncate"]
+        forbidden = ["insert", "update", "delete", "drop", "alter", "truncate", "grant", "revoke", "create"]
         if any(word in lowered for word in forbidden):
-            raise ValidationError("Destructive SQL operations are not allowed")
+            raise SQLInjectionError("Destructive SQL operations are not allowed")
 
     def run_sql(self, question: str) -> str:
         logger.info("postgres_service_run_sql_invoked", question=question)
@@ -141,15 +129,22 @@ SQL:"""
             sql = self._rewrite_sql_for_postgres(sql)
             logger.info("sql_generated", sql=sql)
             self._validate_sql(sql)
+
+            # Validate and quote schema name to prevent SQL injection
+            safe_schema = self._validate_schema_name(self.settings.postgres_schema)
+
             with psycopg2.connect(**self._conn_kwargs()) as conn:
                 with conn.cursor() as cur:
-                    cur.execute(f"SET search_path TO {self.settings.postgres_schema};")
+                    # Use validated and quoted schema name
+                    cur.execute(f"SET search_path TO {safe_schema};")
                     cur.execute(sql)
                     rows = cur.fetchall()
                     col_names = [desc[0] for desc in cur.description] if cur.description else []
+        except (ValidationError, SQLInjectionError):
+            raise
         except Exception as exc:  # noqa: BLE001
             logger.error("sql_error", error=str(exc))
-            raise ServiceError("SQL execution failed") from exc
+            raise DatabaseError("SQL execution failed", operation="execute_query") from exc
 
         if not rows:
             return "No results."
