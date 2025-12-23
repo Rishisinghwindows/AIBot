@@ -205,3 +205,116 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# dependencies
+node_modules/
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# env
+.env
+
+# build output
+dist/
+build/
+
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environment
+venv/
+.venv/
+env/
+ENV/
+
+# Environment variables
+.env
+.env.*
+
+# FastAPI / Uvicorn
+*.log
+uvicorn.log
+
+# IDEs / Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Build / packaging
+build/
+dist/
+*.egg-info/
+
+# Mypy / type checking
+.mypy_cache/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Xcode
+DerivedData/
+build/
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+*.xcworkspace
+!default.xcworkspace
+xcuserdata/
+
+# Swift Package Manager
+.build/
+Packages/
+Package.resolved
+
+# CocoaPods
+Pods/
+Podfile.lock
+
+# Carthage
+Carthage/Build/
+
+# Fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots
+fastlane/test_output
+
+# Logs
+*.log
+
+# Environment / Secrets
+.env
+.env.*
+
+# macOS
+.DS_Store
+
+# IDEs
+.idea/
+.vscode/
+
+# Archives
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+
+
