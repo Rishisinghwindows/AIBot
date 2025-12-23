@@ -124,5 +124,9 @@ fastlane/test_output/
 *.dSYM
 *.dSYM.zip
 
-//Large file
+#Large file
 D23Web/public/puch/Puch_AI_Launch.mp4
+*.mp4
+*.mov
+*.avi
+
