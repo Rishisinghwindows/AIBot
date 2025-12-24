@@ -49,7 +49,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         "/auth/refresh",
     }
 
-    EXEMPT_PREFIXES: tuple = ("/docs", "/redoc", "/web", "/whatsapp", "/pdf", "/auth")
+    EXEMPT_PREFIXES: tuple = ("/docs", "/redoc", "/web", "/whatsapp", "/pdf", "/auth", "/mcp", "/chat")
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         path = request.url.path
@@ -57,9 +57,19 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
         settings = get_settings()
 
-        # Skip all security validation in LITE_MODE (development/testing)
+        # Skip all security validation in LITE_MODE (development/testing only)
+        # SECURITY: Only allow lite_mode bypass in non-production environments
         if settings.lite_mode:
-            return await call_next(request)
+            if settings.environment.lower() in ("production", "prod"):
+                logger.warning(
+                    "security_lite_mode_blocked",
+                    reason="LITE_MODE cannot be enabled in production",
+                    path=path,
+                )
+                # Do NOT bypass security in production, even if lite_mode is set
+            else:
+                logger.debug("security_bypassed_lite_mode", path=path)
+                return await call_next(request)
 
         # Skip validation for exempt paths
         if path in self.EXEMPT_PATHS or path.startswith(self.EXEMPT_PREFIXES):

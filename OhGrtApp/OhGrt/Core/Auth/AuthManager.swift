@@ -176,9 +176,16 @@ class AuthManager: ObservableObject {
         do {
             // Get refresh token for logout request
             if let refreshToken = try await KeychainManager.shared.getRefreshToken() {
-                // Notify backend (best effort)
+                // Notify backend - log errors but continue with local cleanup
                 let request = RefreshTokenRequest(refreshToken: refreshToken)
-                try? await APIClient.shared.requestVoid(endpoint: .logout, body: request)
+                do {
+                    try await APIClient.shared.requestVoid(endpoint: .logout, body: request)
+                    logger.debug("Backend logout successful")
+                } catch {
+                    // SECURITY: Log the error for debugging but continue with local cleanup
+                    // User should still be logged out locally even if backend call fails
+                    logger.warning("Backend logout failed: \(error.localizedDescription). Continuing with local cleanup.")
+                }
             }
 
             // Sign out of Firebase

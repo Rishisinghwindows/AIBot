@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { ChatMessage } from "@/lib/api-client";
 import { User, Bot, Copy, Check, ThumbsUp, ThumbsDown, RefreshCw } from "lucide-react";
@@ -30,6 +30,11 @@ export function MessageBubble({
   const [imageError, setImageError] = useState(false);
   const [copied, setCopied] = useState(false);
   const [feedback, setFeedback] = useState<"up" | "down" | null>(null);
+
+  // Reset imageError when media_url changes
+  useEffect(() => {
+    setImageError(false);
+  }, [message.media_url]);
 
   // Copy message to clipboard
   const handleCopy = useCallback(async () => {
@@ -113,16 +118,14 @@ export function MessageBubble({
           </div>
         )}
 
-        {/* Text Message (show if no rich card OR alongside rich card for context) */}
-        {(!richCard || message.content) && (
+        {/* Text Message (only show if no rich card - cards contain all the info) */}
+        {!richCard && (
           <div
             className={cn(
               "rounded-2xl px-4 py-2.5 text-sm leading-relaxed",
               isUser
                 ? "bg-primary text-primary-foreground rounded-tr-sm"
-                : richCard
-                  ? "bg-zinc-800/50 text-zinc-400 text-xs rounded-tl-sm"
-                  : "bg-muted text-foreground rounded-tl-sm"
+                : "bg-muted text-foreground rounded-tl-sm"
             )}
           >
             {/* Render message with line breaks and code highlighting */}
@@ -144,7 +147,9 @@ export function MessageBubble({
                       alt="Generated image"
                       className="rounded-lg max-w-full h-auto cursor-pointer hover:opacity-90 transition-opacity"
                       style={{ maxHeight: '300px' }}
+                      referrerPolicy="no-referrer"
                       onError={() => setImageError(true)}
+                      loading="eager"
                     />
                   </a>
                 )}

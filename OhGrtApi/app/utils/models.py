@@ -11,6 +11,7 @@ class RouterCategory(str, Enum):
     pdf = "pdf"
     sql = "sql"
     gmail = "gmail"
+    image = "image"
     chat = "chat"
 
 

@@ -140,11 +140,25 @@ final class SSLPinningDelegate: NSObject, URLSessionDelegate {
 
         // If no pinned certificates, check configuration
         if pinnedCertificates.isEmpty {
-            // Only allow bypass if SSL pinning is not enforced (development only)
+            // SECURITY: Only allow bypass if SSL pinning is not enforced (development only)
+            // In production builds, SSL pinning must ALWAYS be enforced
+            #if !DEBUG
+            // Production assertion - SSL pinning bypass is never allowed in release builds
+            assert(AppConfig.shared.enforceSSLPinning,
+                   "SSL pinning must be enforced in production builds")
+            #endif
+
             if !AppConfig.shared.enforceSSLPinning {
+                #if DEBUG
                 AppConfig.shared.debugLog("No pinned certificates - allowing connection (SSL pinning not enforced)")
                 completionHandler(.useCredential, URLCredential(trust: serverTrust))
                 return
+                #else
+                // In release builds, never bypass even if flag is misconfigured
+                print("[SSLPinning] SECURITY: SSL pinning bypass blocked in production")
+                completionHandler(.cancelAuthenticationChallenge, nil)
+                return
+                #endif
             } else {
                 print("[SSLPinning] No pinned certificates - rejecting connection (SSL pinning enforced)")
                 completionHandler(.cancelAuthenticationChallenge, nil)

@@ -1,9 +1,16 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback, useRef, useMemo } from 'react';
 import { User, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { auth, isFirebaseConfigured } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
+
+// SECURITY NOTE: Tokens are stored in localStorage which is vulnerable to XSS attacks.
+// For improved security, consider:
+// 1. Using httpOnly cookies via API routes for token storage
+// 2. Implementing token refresh via secure API endpoints
+// 3. Adding Content Security Policy headers (done in next.config.mjs)
+// See: https://owasp.org/www-community/attacks/xss/
 
 interface UserProfile {
   id: string;
@@ -112,6 +119,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
 
+    // If Firebase is not configured, just finish loading
+    if (!isFirebaseConfigured || !auth) {
+      console.warn("[Auth] Firebase not configured - running in anonymous mode");
+      setLoading(false);
+      return;
+    }
+
     let authStateReceived = false;
 
     // Timeout fallback: if Firebase takes too long to initialize, stop loading
@@ -181,6 +195,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [fetchProfile]);
 
   const login = async () => {
+    if (!isFirebaseConfigured || !auth) {
+      console.error("[Auth] Firebase not configured - cannot login");
+      return;
+    }
     setLoading(true);
     try {
       const provider = new GoogleAuthProvider();
@@ -210,7 +228,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      await signOut(auth);
+      if (auth) {
+        await signOut(auth);
+      }
       setCurrentProfile(null);
       setAccessToken(null);
       setRefreshToken(null);
@@ -228,8 +248,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  return (
-    <AuthContext.Provider value={{
+  // Memoize context value to prevent unnecessary re-renders
+  const value = useMemo(
+    () => ({
       currentUser,
       currentProfile,
       loading,
@@ -238,7 +259,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       idToken,
       accessToken,
       refreshToken,
-    }}>
+    }),
+    [currentUser, currentProfile, loading, login, logout, idToken, accessToken, refreshToken]
+  );
+
+  return (
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

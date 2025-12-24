@@ -23,6 +23,7 @@ from app.services.astrology_service import get_astrology_service
 from app.services.travel_service import get_travel_service
 from app.services.news_service import get_news_service
 from app.services.schedule_parser import parse_schedule, extract_task_from_message
+from app.graph.nodes.image_node import generate_image_fal, _clean_prompt
 from app.utils.llm import build_chat_llm
 from app.utils.models import RouterCategory
 
@@ -94,7 +95,7 @@ class ToolAgent:
 
     def _build_tools(self):
         """Construct tool set and state for a single invocation."""
-        last_tool: Dict[str, str] = {"name": RouterCategory.chat.value}
+        last_tool: Dict[str, Any] = {"name": RouterCategory.chat.value, "structured_data": None}
         llm = self.llm
 
         @tool("weather", return_direct=True)
@@ -102,6 +103,14 @@ class ToolAgent:
             """Get live weather for a city using OpenWeather."""
             last_tool["name"] = RouterCategory.weather.value
             weather = await self.weather_service.get_weather(city)
+            # Store structured data for card rendering
+            last_tool["structured_data"] = {
+                "city": weather.city,
+                "temperature": weather.temperature_c,
+                "humidity": weather.humidity,
+                "condition": weather.condition,
+                "raw": weather.raw if hasattr(weather, 'raw') else {},
+            }
             return (
                 f"Weather for {weather.city}: {weather.temperature_c}°C, "
                 f"humidity {weather.humidity}%, condition {weather.condition}."
@@ -248,6 +257,19 @@ class ToolAgent:
             result = await self.astrology_service.get_horoscope(sign, period)
             if result["success"]:
                 data = result["data"]
+                # Store structured data for card rendering
+                last_tool["structured_data"] = {
+                    "sign": data.get("sign"),
+                    "zodiac_sign": data.get("sign"),
+                    "period": data.get("period"),
+                    "horoscope": data.get("horoscope"),
+                    "daily_horoscope": data.get("horoscope"),
+                    "lucky_number": data.get("lucky_number"),
+                    "lucky_color": data.get("lucky_color"),
+                    "advice": data.get("advice"),
+                    "mood": data.get("mood"),
+                    "compatibility": data.get("compatibility"),
+                }
                 return (
                     f"*{data['sign']} {data['period'].title()} Horoscope*\n\n"
                     f"{data['horoscope']}\n\n"
@@ -358,6 +380,19 @@ class ToolAgent:
             result = await self.astrology_service.calculate_numerology(name, birth_date or None)
             if result["success"]:
                 data = result["data"]
+                # Store structured data for card rendering
+                last_tool["structured_data"] = {
+                    "name": data.get("name"),
+                    "name_number": data.get("name_number"),
+                    "name_meaning": data.get("name_meaning"),
+                    "birth_date": data.get("birth_date"),
+                    "life_path_number": data.get("life_path_number"),
+                    "life_path_meaning": data.get("life_path_meaning"),
+                    "lucky_numbers": data.get("lucky_numbers", []),
+                    "expression_number": data.get("expression_number"),
+                    "soul_urge_number": data.get("soul_urge_number"),
+                    "personality_number": data.get("personality_number"),
+                }
                 response = f"*Numerology for {data['name']}*\n\n"
                 response += f"Name Number: {data['name_number']}\n"
                 meaning = data.get('name_meaning', {})
@@ -378,6 +413,13 @@ class ToolAgent:
             result = await self.astrology_service.draw_tarot(question or None, spread_type)
             if result["success"]:
                 data = result["data"]
+                # Store structured data for card rendering
+                last_tool["structured_data"] = {
+                    "spread_type": data.get("spread_type"),
+                    "question": data.get("question"),
+                    "cards": data.get("cards", []),
+                    "interpretation": data.get("interpretation"),
+                }
                 response = f"*Tarot Reading ({data['spread_type'].replace('_', ' ').title()})*\n\n"
                 if data.get('question'):
                     response += f"Question: {data['question']}\n\n"
@@ -408,6 +450,18 @@ class ToolAgent:
             result = await self.travel_service.get_pnr_status(pnr)
             if result["success"]:
                 data = result["data"]
+                # Store structured data for card rendering
+                last_tool["structured_data"] = {
+                    "pnr": data.get("pnr"),
+                    "train_number": data.get("train_number"),
+                    "train_name": data.get("train_name"),
+                    "from_station": data.get("from_station"),
+                    "to_station": data.get("to_station"),
+                    "journey_date": data.get("journey_date"),
+                    "class": data.get("class"),
+                    "chart_prepared": data.get("chart_prepared"),
+                    "passengers": data.get("passengers", []),
+                }
                 response = f"*PNR Status: {data['pnr']}*\n\n"
                 response += f"Train: {data['train_name']} ({data['train_number']})\n"
                 response += f"From: {data['from_station']}\n"
@@ -467,6 +521,13 @@ class ToolAgent:
             result = await self.news_service.get_news(query or None, category or None, limit=5)
             if result["success"]:
                 data = result["data"]
+                # Store structured data for card rendering
+                last_tool["structured_data"] = {
+                    "articles": data.get("articles", []),
+                    "items": data.get("articles", []),
+                    "query": data.get("query"),
+                    "category": data.get("category"),
+                }
                 response = "*Latest News*\n"
                 if data.get('query'):
                     response += f"(Search: {data['query']})\n"
@@ -480,6 +541,27 @@ class ToolAgent:
                     response += f"   Source: {article['source']}\n\n"
                 return response
             return f"Could not get news: {result.get('error', 'Unknown error')}"
+
+        # ==================== IMAGE GENERATION TOOL ====================
+
+        @tool("image_gen", return_direct=True)
+        async def image_gen_tool(prompt: str) -> str:
+            """Generate an AI image from a text description. Describe what you want to see."""
+            last_tool["name"] = "image_gen"
+            clean_prompt = _clean_prompt(prompt)
+            result = await generate_image_fal(clean_prompt)
+            if result.get("success"):
+                image_url = result.get("data", {}).get("image_url")
+                if image_url:
+                    last_tool["media_url"] = image_url
+                    last_tool["structured_data"] = {
+                        "prompt": clean_prompt,
+                        "image_url": image_url,
+                    }
+                    # Return just the prompt description - image displays via media_url
+                    return f"Here's the generated image for: {clean_prompt}"
+            error = result.get("error", "Unknown error")
+            return f"Could not generate image: {error}"
 
         # ==================== UBER TOOLS ====================
 
@@ -696,6 +778,8 @@ class ToolAgent:
             metro_info_tool,
             # D23Bot News tool
             news_tool,
+            # Image generation tool
+            image_gen_tool,
             # Uber tools
             uber_profile_tool,
             uber_history_tool,
@@ -769,6 +853,8 @@ class ToolAgent:
                     "response": result,
                     "category": RouterCategory.pdf.value,
                     "route_log": [RouterCategory.pdf.value],
+                    "intent": RouterCategory.pdf.value,
+                    "structured_data": None,
                 }
 
         result = await agent.ainvoke({"messages": [HumanMessage(content=message)]})
@@ -782,6 +868,9 @@ class ToolAgent:
             "response": content or "No response",
             "category": last_tool["name"],
             "route_log": [last_tool["name"]],
+            "intent": last_tool["name"],
+            "structured_data": last_tool.get("structured_data"),
+            "media_url": last_tool.get("media_url"),
         }
 
 

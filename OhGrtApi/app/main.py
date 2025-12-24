@@ -24,6 +24,7 @@ from app.web import web_router
 from app.tasks.router import router as tasks_router, web_router as tasks_web_router
 from app.oauth import gmail_router, github_router, slack_router, jira_router, uber_router
 from app.personas.router import router as personas_router, public_router as personas_public_router
+from app.mcp.router import router as mcp_router
 from app.tasks.scheduler import start_scheduler, stop_scheduler
 from app.config import Settings, get_settings
 from app.db.base import Base, engine, SessionLocal
@@ -240,6 +241,9 @@ app.include_router(uber_router)
 # Persona routers
 app.include_router(personas_router)
 app.include_router(personas_public_router)
+
+# MCP router
+app.include_router(mcp_router)
 
 
 def get_services(settings: Settings):

@@ -68,21 +68,30 @@ class ChatService:
         credentials = self._load_credentials(user)
 
         # Get AI response using the tool agent (user-specific)
+        intent = None
+        structured_data = None
+        media_url = None
         try:
             agent = build_tool_agent(self.settings, credentials=credentials)
             result = await agent.invoke(message, allowed_tools=allowed_tools)
             ai_content = result.get("response", "I apologize, but I couldn't process your request.")
             route_log = result.get("route_log", [])
+            intent = result.get("intent") or result.get("category", "chat")
+            structured_data = result.get("structured_data")
+            media_url = result.get("media_url")
             ai_message_metadata = {
                 "category": result.get("category", "chat"),
                 "route_log": ", ".join(route_log) if isinstance(route_log, list) else str(route_log),
+                "intent": intent,
             }
         except Exception as e:
             logger.error("chat_agent_error", error=str(e))
             ai_content = "I apologize, but an error occurred while processing your request."
             ai_message_metadata = {"error": str(e)}
 
-        # Store assistant message
+        # Store assistant message with structured data in metadata
+        ai_message_metadata["structured_data"] = structured_data
+        ai_message_metadata["media_url"] = media_url
         assistant_msg = ChatMessage(
             user_id=user.id,
             conversation_id=conversation_id,
@@ -157,16 +166,45 @@ class ChatService:
         Returns:
             List of conversation summaries
         """
-        # Get distinct conversations with aggregated info
+        from sqlalchemy import text, literal_column
+        from sqlalchemy.orm import aliased
+
+        # PERFORMANCE FIX: Use a subquery to get first messages in one query
+        # instead of N+1 queries (one per conversation)
+
+        # Subquery to get the first user message per conversation using DISTINCT ON
+        first_messages_subquery = (
+            self.db.query(
+                ChatMessage.conversation_id,
+                ChatMessage.content,
+            )
+            .filter(
+                ChatMessage.user_id == user.id,
+                ChatMessage.role == "user",
+            )
+            .distinct(ChatMessage.conversation_id)
+            .order_by(ChatMessage.conversation_id, ChatMessage.created_at)
+            .subquery()
+        )
+
+        # Get distinct conversations with aggregated info and first message
         conversations = (
             self.db.query(
                 ChatMessage.conversation_id,
                 func.count(ChatMessage.id).label("message_count"),
                 func.max(ChatMessage.created_at).label("last_message_at"),
                 func.min(ChatMessage.created_at).label("created_at"),
+                first_messages_subquery.c.content.label("first_message"),
             )
             .filter(ChatMessage.user_id == user.id)
-            .group_by(ChatMessage.conversation_id)
+            .outerjoin(
+                first_messages_subquery,
+                ChatMessage.conversation_id == first_messages_subquery.c.conversation_id,
+            )
+            .group_by(
+                ChatMessage.conversation_id,
+                first_messages_subquery.c.content,
+            )
             .order_by(func.max(ChatMessage.created_at).desc())
             .limit(limit)
             .all()
@@ -174,17 +212,12 @@ class ChatService:
 
         result = []
         for conv in conversations:
-            # Get first user message as title
-            first_msg = (
-                self.db.query(ChatMessage)
-                .filter(
-                    ChatMessage.conversation_id == conv.conversation_id,
-                    ChatMessage.role == "user",
-                )
-                .order_by(ChatMessage.created_at)
-                .first()
+            first_msg_content = conv.first_message
+            title = (
+                first_msg_content[:50] + "..."
+                if first_msg_content and len(first_msg_content) > 50
+                else first_msg_content
             )
-            title = first_msg.content[:50] + "..." if first_msg and len(first_msg.content) > 50 else (first_msg.content if first_msg else None)
 
             result.append({
                 "id": conv.conversation_id,
@@ -227,6 +260,9 @@ class ChatService:
         return deleted
 
     def _load_credentials(self, user: User) -> dict:
+        """Load and decrypt user's integration credentials."""
+        from app.utils.crypto import decrypt_if_needed
+
         creds = (
             self.db.query(IntegrationCredential)
             .filter(IntegrationCredential.user_id == user.id)
@@ -234,9 +270,21 @@ class ChatService:
         )
         cred_map = {}
         for cred in creds:
-            cred_map[cred.provider] = {
-                "access_token": cred.access_token,
-                "config": cred.config or {},
-                "display_name": cred.display_name,
-            }
+            try:
+                # Decrypt the access token before returning
+                decrypted_token = decrypt_if_needed(cred.access_token) if cred.access_token else None
+                cred_map[cred.provider] = {
+                    "access_token": decrypted_token,
+                    "config": cred.config or {},
+                    "display_name": cred.display_name,
+                }
+            except ValueError as e:
+                logger.error(
+                    "credential_decryption_failed",
+                    provider=cred.provider,
+                    user_id=str(user.id),
+                    error=str(e),
+                )
+                # Skip this credential if decryption fails
+                continue
         return cred_map
