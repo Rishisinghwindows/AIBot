@@ -83,28 +83,28 @@ class Settings(BaseSettings):
     slack_token: str = ""
     slack_client_id: str = ""
     slack_client_secret: str = ""
-    slack_redirect_uri: str = "ohgrt://oauth/slack"
+    slack_redirect_uri: str = "http://localhost:3000/settings/slack/callback"
     confluence_base_url: str = ""
     confluence_user: str = ""
     confluence_api_token: str = ""
     github_client_id: str = ""
     github_client_secret: str = ""
-    github_redirect_uri: str = "ohgrt://oauth/github"
+    github_redirect_uri: str = "http://localhost:3000/settings/github/callback"
     google_oauth_client_id: str = ""
     google_oauth_client_secret: str = ""
-    google_oauth_redirect_uri: str = "ohgrt://oauth/google"
+    google_oauth_redirect_uri: str = "http://localhost:3000/settings/gmail/callback"
     google_gmail_scopes: str = "https://www.googleapis.com/auth/gmail.readonly"
     google_drive_scopes: str = "https://www.googleapis.com/auth/drive.readonly"
 
     # Jira/Atlassian OAuth
     atlassian_client_id: str = ""
     atlassian_client_secret: str = ""
-    atlassian_redirect_uri: str = "ohgrt://oauth/jira"
+    atlassian_redirect_uri: str = "http://localhost:3000/settings/jira/callback"
 
     # Uber OAuth
     uber_client_id: str = ""
     uber_client_secret: str = ""
-    uber_redirect_uri: str = "ohgrt://oauth/uber"
+    uber_redirect_uri: str = "http://localhost:3000/settings/uber/callback"
 
     # JWT Settings
     jwt_secret_key: str = Field(default="", description="Secret key for JWT signing")

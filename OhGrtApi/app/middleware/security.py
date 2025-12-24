@@ -49,7 +49,11 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         "/auth/refresh",
     }
 
-    EXEMPT_PREFIXES: tuple = ("/docs", "/redoc", "/web", "/whatsapp", "/pdf", "/auth", "/mcp", "/chat")
+    EXEMPT_PREFIXES: tuple = (
+        "/docs", "/redoc", "/web", "/whatsapp", "/pdf", "/auth", "/mcp", "/chat",
+        # OAuth provider endpoints
+        "/gmail", "/slack", "/jira", "/github", "/uber",
+    )
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         path = request.url.path

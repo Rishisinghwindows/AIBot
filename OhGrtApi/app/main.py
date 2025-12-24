@@ -200,8 +200,23 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 # Get settings for CORS configuration
 _settings = get_settings()
 
-# CORS middleware - uses environment-based configuration
-# In production, set CORS_ORIGINS to specific allowed origins
+# Middleware order: Last added = First executed on requests
+# So we add in reverse order of desired execution
+
+# Security headers middleware (validates X-Request-ID, X-Nonce, X-Timestamp)
+app.add_middleware(SecurityHeadersMiddleware)
+
+# Rate limiting middleware
+app.add_middleware(RateLimitMiddleware)
+
+# Metrics middleware (captures request metrics)
+app.add_middleware(MetricsMiddleware)
+
+# Correlation ID middleware (sets up request context for logging)
+app.add_middleware(CorrelationIdMiddleware)
+
+# CORS middleware - MUST be added last so it's executed first
+# This ensures CORS preflight (OPTIONS) requests are handled before other middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_settings.cors_origins_list,
@@ -210,18 +225,6 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["X-Request-ID", "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset"],
 )
-
-# Correlation ID middleware (outermost - sets up request context for logging)
-app.add_middleware(CorrelationIdMiddleware)
-
-# Metrics middleware (captures request metrics)
-app.add_middleware(MetricsMiddleware)
-
-# Rate limiting middleware (must be before security middleware)
-app.add_middleware(RateLimitMiddleware)
-
-# Security headers middleware (validates X-Request-ID, X-Nonce, X-Timestamp)
-app.add_middleware(SecurityHeadersMiddleware)
 
 # Include routers
 app.include_router(auth_router)

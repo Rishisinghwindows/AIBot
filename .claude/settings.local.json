@@ -21,7 +21,8 @@
       "Bash(pgrep:*)",
       "Bash(SESSION_ID=\"hxTzQbYcQP01GEA9ViD_UEt2fCeYKR102o70GXyenXY\":*)",
       "WebSearch",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(grep:*)"
     ]
   }
 }
