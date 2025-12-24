@@ -27,6 +27,13 @@ class OAuthExchangeRequest(BaseModel):
     state: str | None = None
 
 
+class DevConnectRequest(BaseModel):
+    """Request to connect GitHub with PAT (dev only)."""
+    token: str
+    owner: str
+    repo: str
+
+
 router = APIRouter(prefix="/github", tags=["github-oauth"])
 
 GITHUB_AUTH_URL = "https://github.com/login/oauth/authorize"
@@ -131,14 +138,19 @@ async def github_callback(
             username = user_data.get("login")
             name = user_data.get("name")
 
-    # Store credentials
+    # Store credentials - use username as default owner
     get_or_create_credential(
         db=db,
         user_id=current_user.id,
         provider="github",
         access_token=access_token,
         scope="user repo read:org",
-        extra_config={"username": username, "name": name},
+        extra_config={
+            "username": username,
+            "name": name,
+            "owner": username,
+            "repo": "",
+        },
     )
 
     logger.info("github_oauth_connected", user_id=str(current_user.id), username=username)
@@ -199,19 +211,65 @@ async def github_exchange(
             username = user_data.get("login")
             name = user_data.get("name")
 
-    # Store credentials
+    # Store credentials - use username as default owner
     get_or_create_credential(
         db=db,
         user_id=current_user.id,
         provider="github",
         access_token=access_token,
         scope="user repo read:org",
-        extra_config={"username": username, "name": name},
+        extra_config={
+            "username": username,
+            "name": name,
+            "owner": username,
+            "repo": "",
+        },
     )
 
     logger.info("github_oauth_exchanged", user_id=str(current_user.id), username=username)
 
     return {"success": True, "username": username, "name": name, "connected": True}
+
+
+class SetRepoRequest(BaseModel):
+    """Request to set GitHub repo for tools."""
+    owner: str | None = None
+    repo: str
+
+
+@router.post("/set-repo")
+async def github_set_repo(
+    request: SetRepoRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Set the GitHub repo to use for tools (search/create issues)."""
+    credential = get_credential(db, current_user.id, "github")
+    if not credential:
+        raise HTTPException(status_code=404, detail="GitHub not connected. Connect GitHub first.")
+
+    # Update the config with repo info
+    config = credential.config or {}
+    if request.owner:
+        config["owner"] = request.owner
+    config["repo"] = request.repo
+
+    credential.config = config
+    db.commit()
+
+    logger.info(
+        "github_repo_set",
+        user_id=str(current_user.id),
+        owner=config.get("owner"),
+        repo=request.repo,
+    )
+
+    return {
+        "success": True,
+        "owner": config.get("owner"),
+        "repo": request.repo,
+        "message": f"GitHub repo set to {config.get('owner')}/{request.repo}",
+    }
 
 
 @router.delete("/disconnect")
@@ -224,3 +282,181 @@ async def github_disconnect(
     if deleted:
         return {"success": True, "message": "GitHub disconnected"}
     raise HTTPException(status_code=404, detail="GitHub not connected")
+
+
+# ============================================================================
+# GitHub Tool API Endpoints
+# ============================================================================
+
+class SearchIssuesRequest(BaseModel):
+    """Request to search GitHub issues."""
+    query: str
+
+
+class CreateIssueRequest(BaseModel):
+    """Request to create GitHub issue."""
+    title: str
+    body: str
+
+
+@router.post("/search-issues")
+async def github_search_issues(
+    request: SearchIssuesRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Search GitHub issues in the configured repository."""
+    from app.services.github_service import GitHubService
+
+    credential = get_credential(db, current_user.id, "github")
+    if not credential:
+        raise HTTPException(status_code=404, detail="GitHub not connected. Connect GitHub first.")
+
+    config = credential.config or {}
+    owner = config.get("owner")
+    repo = config.get("repo")
+
+    if not repo:
+        raise HTTPException(
+            status_code=400,
+            detail="Repository not configured. Use POST /github/set-repo to set your repository.",
+        )
+
+    service = GitHubService(
+        token=credential.access_token,
+        owner=owner,
+        repo=repo,
+    )
+
+    result = await service.search_issues(request.query)
+    logger.info(
+        "github_search_issues",
+        user_id=str(current_user.id),
+        query=request.query,
+        owner=owner,
+        repo=repo,
+    )
+
+    return {"success": True, "result": result}
+
+
+@router.post("/create-issue")
+async def github_create_issue(
+    request: CreateIssueRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Create a GitHub issue in the configured repository."""
+    from app.services.github_service import GitHubService
+
+    credential = get_credential(db, current_user.id, "github")
+    if not credential:
+        raise HTTPException(status_code=404, detail="GitHub not connected. Connect GitHub first.")
+
+    config = credential.config or {}
+    owner = config.get("owner")
+    repo = config.get("repo")
+
+    if not repo:
+        raise HTTPException(
+            status_code=400,
+            detail="Repository not configured. Use POST /github/set-repo to set your repository.",
+        )
+
+    service = GitHubService(
+        token=credential.access_token,
+        owner=owner,
+        repo=repo,
+    )
+
+    result = await service.create_issue(request.title, request.body)
+    logger.info(
+        "github_create_issue",
+        user_id=str(current_user.id),
+        title=request.title,
+        owner=owner,
+        repo=repo,
+    )
+
+    return {"success": True, "result": result}
+
+
+# ============================================================================
+# Development Endpoint (PAT-based connection)
+# ============================================================================
+
+@router.post("/dev-connect")
+async def github_dev_connect(
+    request: DevConnectRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Connect GitHub using a Personal Access Token (development/testing only).
+
+    This bypasses OAuth and directly stores the PAT with owner/repo config.
+    Useful for testing GitHub tools without full OAuth setup.
+
+    Get a PAT from: https://github.com/settings/tokens
+    Required scopes: repo, read:user
+    """
+    settings = get_settings()
+
+    # Verify it's not production
+    if settings.environment == "production":
+        raise HTTPException(
+            status_code=403,
+            detail="Dev connect not available in production. Use OAuth flow.",
+        )
+
+    # Verify the token works by fetching user info
+    async with httpx.AsyncClient() as client:
+        user_response = await client.get(
+            GITHUB_USER_URL,
+            headers={
+                "Authorization": f"Bearer {request.token}",
+                "Accept": "application/vnd.github+json",
+            },
+        )
+
+        if user_response.status_code != 200:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid GitHub token: {user_response.text}",
+            )
+
+        user_data = user_response.json()
+        username = user_data.get("login")
+        name = user_data.get("name")
+
+    # Store credentials
+    get_or_create_credential(
+        db=db,
+        user_id=current_user.id,
+        provider="github",
+        access_token=request.token,
+        scope="repo read:user",
+        extra_config={
+            "username": username,
+            "name": name,
+            "owner": request.owner,
+            "repo": request.repo,
+        },
+    )
+
+    logger.info(
+        "github_dev_connected",
+        user_id=str(current_user.id),
+        username=username,
+        owner=request.owner,
+        repo=request.repo,
+    )
+
+    return {
+        "success": True,
+        "username": username,
+        "name": name,
+        "owner": request.owner,
+        "repo": request.repo,
+        "message": f"GitHub connected! You can now use GitHub tools for {request.owner}/{request.repo}",
+    }

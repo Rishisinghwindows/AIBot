@@ -230,7 +230,42 @@ def _register_builtin_tools(server: MCPServer) -> None:
         ),
     )
 
-    logger.info("mcp_builtin_tools_registered", count=8)
+    # GitHub tools (require OAuth connection + set-repo)
+    server.register_tool(
+        name="github_search_issues",
+        handler=_tool_github_search_issues,
+        description="Search GitHub issues in your configured repository",
+        input_schema=ToolInputSchema(
+            properties={
+                "query": {
+                    "type": "string",
+                    "description": "Search query for issues (e.g., 'bug', 'feature request', 'is:open')",
+                },
+            },
+            required=["query"],
+        ),
+    )
+
+    server.register_tool(
+        name="github_create_issue",
+        handler=_tool_github_create_issue,
+        description="Create a new GitHub issue in your configured repository",
+        input_schema=ToolInputSchema(
+            properties={
+                "title": {
+                    "type": "string",
+                    "description": "Issue title",
+                },
+                "body": {
+                    "type": "string",
+                    "description": "Issue description/body",
+                },
+            },
+            required=["title", "body"],
+        ),
+    )
+
+    logger.info("mcp_builtin_tools_registered", count=10)
 
 
 # Tool implementations (these delegate to actual services)
@@ -265,17 +300,17 @@ async def _tool_check_pnr(pnr_number: str) -> str:
 
     settings = get_settings()
     service = TravelService(settings)
-    return await service.check_pnr_status(pnr_number)
+    result = await service.get_pnr_status(pnr_number)
+    return str(result)
 
 
 async def _tool_get_horoscope(sign: str, day: str = "today") -> str:
     """Get horoscope - delegates to astrology service."""
-    from app.config import get_settings
     from app.services.astrology_service import AstrologyService
 
-    settings = get_settings()
-    service = AstrologyService(settings)
-    return await service.get_horoscope(sign, day)
+    service = AstrologyService()
+    result = await service.get_horoscope(sign, day)
+    return str(result)
 
 
 async def _tool_translate(
@@ -289,34 +324,120 @@ async def _tool_translate(
 
 
 async def _tool_generate_image(prompt: str, style: str = "realistic") -> str:
-    """Generate image - delegates to image service."""
-    from app.config import get_settings
-    from app.services.image_service import ImageService
+    """Generate image - uses fal.ai FLUX model."""
+    from app.graph.nodes.image_node import generate_image_fal, _clean_prompt
 
-    settings = get_settings()
-    service = ImageService(settings)
-    result = await service.generate_image(prompt)
-    return result
+    clean_prompt = _clean_prompt(prompt)
+    if style and style != "realistic":
+        clean_prompt = f"{clean_prompt}, {style} style"
+
+    result = await generate_image_fal(clean_prompt)
+    if result.get("success"):
+        image_url = result.get("data", {}).get("image_url")
+        if image_url:
+            return f"Generated image: {image_url}"
+    return f"Failed to generate image: {result.get('error', 'Unknown error')}"
 
 
 async def _tool_web_search(query: str, num_results: int = 5) -> str:
-    """Web search - delegates to search service."""
+    """Web search - uses Tavily search API."""
     from app.config import get_settings
-    from app.services.search_service import SearchService
+    from langchain_community.tools.tavily_search import TavilySearchResults
 
     settings = get_settings()
-    service = SearchService(settings)
-    return await service.search(query, max_results=num_results)
+    if not settings.tavily_api_key:
+        return "Web search not configured. Set TAVILY_API_KEY in environment."
+
+    import os
+    os.environ["TAVILY_API_KEY"] = settings.tavily_api_key
+
+    search = TavilySearchResults(max_results=num_results)
+    results = await search.ainvoke(query)
+
+    if not results:
+        return f"No results found for: {query}"
+
+    # Format results
+    output = []
+    for r in results:
+        output.append(f"• {r.get('title', 'No title')}\n  {r.get('url', '')}\n  {r.get('content', '')[:200]}...")
+
+    return f"Search results for '{query}':\n\n" + "\n\n".join(output)
 
 
 async def _tool_search_documents(query: str, document_type: str = "all") -> str:
-    """Search documents - delegates to PDF service."""
+    """Search documents - uses RAG service for PDF search."""
     from app.config import get_settings
-    from app.services.pdf_service import PDFService
+    from app.services.rag_service import RAGService
 
     settings = get_settings()
-    service = PDFService(settings)
-    return await service.search(query)
+    service = RAGService(settings)
+
+    try:
+        results = await service.similarity_search(query, k=5)
+        if not results:
+            return f"No documents found matching: {query}"
+
+        output = []
+        for i, (doc, score) in enumerate(results, 1):
+            content = doc.page_content[:300] if doc.page_content else ""
+            source = doc.metadata.get("source", "Unknown")
+            output.append(f"{i}. [{source}] (score: {score:.2f})\n   {content}...")
+
+        return f"Document search results for '{query}':\n\n" + "\n\n".join(output)
+    except Exception as e:
+        return f"Document search error: {str(e)}"
+
+
+async def _tool_github_search_issues(query: str, user_id: Optional[str] = None, db: Optional[Any] = None) -> str:
+    """Search GitHub issues - requires OAuth connection and set-repo."""
+    from app.services.github_service import GitHubService
+    from app.oauth.base import get_credential
+    from app.db.session import SessionLocal
+
+    # Get database session if not provided
+    if db is None:
+        db = SessionLocal()
+        should_close = True
+    else:
+        should_close = False
+
+    try:
+        # For now, we'll return a message that GitHub needs to be configured
+        # In a real scenario, we'd get user_id from the request context
+        return (
+            "GitHub search requires authentication. "
+            "Please connect GitHub via Settings > Integrations > GitHub, "
+            "then set your repository using POST /github/set-repo with {\"repo\": \"repo-name\"}."
+        )
+    finally:
+        if should_close:
+            db.close()
+
+
+async def _tool_github_create_issue(title: str, body: str, user_id: Optional[str] = None, db: Optional[Any] = None) -> str:
+    """Create GitHub issue - requires OAuth connection and set-repo."""
+    from app.services.github_service import GitHubService
+    from app.oauth.base import get_credential
+    from app.db.session import SessionLocal
+
+    # Get database session if not provided
+    if db is None:
+        db = SessionLocal()
+        should_close = True
+    else:
+        should_close = False
+
+    try:
+        # For now, we'll return a message that GitHub needs to be configured
+        return (
+            "GitHub issue creation requires authentication. "
+            "Please connect GitHub via Settings > Integrations > GitHub, "
+            "then set your repository using POST /github/set-repo with {\"repo\": \"repo-name\"}."
+        )
+    finally:
+        if should_close:
+            db.close()
 
 
 # ============================================================================
@@ -515,3 +636,402 @@ async def connect_external_server(
             tools=[],
             connected=False,
         )
+
+
+# ============================================================================
+# Persistent MCP Server Management (Like Claude Desktop)
+# ============================================================================
+
+from app.auth.dependencies import get_db
+from app.oauth.base import get_or_create_credential, get_credential, delete_credential
+from sqlalchemy.orm import Session
+
+
+class AddMCPServerRequest(BaseModel):
+    """Request to add an MCP server."""
+    name: str
+    url: str
+    token: Optional[str] = None
+    description: Optional[str] = None
+
+
+class MCPServerConfig(BaseModel):
+    """Stored MCP server configuration."""
+    name: str
+    url: str
+    description: Optional[str] = None
+    connected: bool = False
+    tool_count: int = 0
+
+
+class MCPServersResponse(BaseModel):
+    """Response with all user's MCP servers."""
+    servers: List[MCPServerConfig]
+
+
+@router.post("/servers", response_model=MCPServerConfig)
+async def add_mcp_server(
+    request: AddMCPServerRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> MCPServerConfig:
+    """
+    Add a persistent MCP server connection (like Claude Desktop).
+
+    The server will be stored and its tools will be available
+    in all future chat sessions.
+    """
+    # Test connection first
+    client = MCPClient(base_url=request.url, token=request.token)
+    tool_count = 0
+    connected = False
+
+    try:
+        async with client:
+            tools = await client.list_tools()
+            tool_count = len(tools)
+            connected = True
+    except Exception as e:
+        logger.warning("mcp_server_connection_test_failed", url=request.url, error=str(e))
+
+    # Store using provider pattern: mcp_server_{name}
+    provider_name = f"mcp_server_{request.name}"
+    get_or_create_credential(
+        db=db,
+        user_id=current_user.id,
+        provider=provider_name,
+        access_token=request.token or "",
+        extra_config={
+            "name": request.name,
+            "url": request.url,
+            "description": request.description,
+        },
+    )
+
+    logger.info(
+        "mcp_server_added",
+        user_id=str(current_user.id),
+        name=request.name,
+        url=request.url,
+        tool_count=tool_count,
+    )
+
+    return MCPServerConfig(
+        name=request.name,
+        url=request.url,
+        description=request.description,
+        connected=connected,
+        tool_count=tool_count,
+    )
+
+
+@router.get("/servers", response_model=MCPServersResponse)
+async def list_mcp_servers(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> MCPServersResponse:
+    """
+    List all configured MCP servers for the current user.
+    """
+    from app.db.models import IntegrationCredential
+
+    credentials = (
+        db.query(IntegrationCredential)
+        .filter(
+            IntegrationCredential.user_id == current_user.id,
+            IntegrationCredential.provider.like("mcp_server_%"),
+        )
+        .all()
+    )
+
+    servers = []
+    for cred in credentials:
+        config = cred.config or {}
+        servers.append(MCPServerConfig(
+            name=config.get("name", cred.provider.replace("mcp_server_", "")),
+            url=config.get("url", ""),
+            description=config.get("description"),
+            connected=False,  # We'd need to test each one
+            tool_count=0,
+        ))
+
+    return MCPServersResponse(servers=servers)
+
+
+@router.delete("/servers/{name}")
+async def remove_mcp_server(
+    name: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Remove an MCP server configuration.
+    """
+    provider_name = f"mcp_server_{name}"
+    deleted = delete_credential(db, current_user.id, provider_name)
+
+    if deleted:
+        logger.info("mcp_server_removed", user_id=str(current_user.id), name=name)
+        return {"success": True, "message": f"MCP server '{name}' removed"}
+
+    raise HTTPException(status_code=404, detail=f"MCP server '{name}' not found")
+
+
+@router.get("/servers/{name}/tools")
+async def get_mcp_server_tools(
+    name: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """
+    Get tools from a specific MCP server.
+    """
+    provider_name = f"mcp_server_{name}"
+    credential = get_credential(db, current_user.id, provider_name)
+
+    if not credential:
+        raise HTTPException(status_code=404, detail=f"MCP server '{name}' not found")
+
+    config = credential.config or {}
+    url = config.get("url")
+    token = credential.access_token if credential.access_token else None
+
+    client = MCPClient(base_url=url, token=token)
+
+    try:
+        async with client:
+            tools = await client.list_tools()
+            return {
+                "name": name,
+                "url": url,
+                "connected": True,
+                "tools": [t.model_dump() for t in tools],
+            }
+    except Exception as e:
+        return {
+            "name": name,
+            "url": url,
+            "connected": False,
+            "tools": [],
+            "error": str(e),
+        }
+
+
+@router.post("/servers/{name}/call")
+async def call_mcp_server_tool(
+    name: str,
+    request: ToolCallRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ToolCallResponse:
+    """
+    Call a tool on a specific MCP server.
+    """
+    provider_name = f"mcp_server_{name}"
+    credential = get_credential(db, current_user.id, provider_name)
+
+    if not credential:
+        raise HTTPException(status_code=404, detail=f"MCP server '{name}' not found")
+
+    config = credential.config or {}
+    url = config.get("url")
+    token = credential.access_token if credential.access_token else None
+
+    client = MCPClient(base_url=url, token=token)
+
+    try:
+        async with client:
+            result = await client.call_tool(request.name, request.arguments)
+
+            if result.isError:
+                return ToolCallResponse(
+                    success=False,
+                    error=str(result.content),
+                )
+
+            # Extract text from result
+            result_text = ""
+            for content in result.content:
+                if hasattr(content, "text"):
+                    result_text += content.text
+                elif isinstance(content, dict) and "text" in content:
+                    result_text += content["text"]
+
+            return ToolCallResponse(
+                success=True,
+                result=result_text,
+            )
+    except Exception as e:
+        return ToolCallResponse(
+            success=False,
+            error=str(e),
+        )
+
+
+# ============================================================================
+# MCP Manager Status & Control (Caching, Health Checks)
+# ============================================================================
+
+from app.mcp.manager import MCPManager, ServerStatus
+
+
+class MCPManagerStats(BaseModel):
+    """MCP manager statistics."""
+    total_users: int
+    total_servers: int
+    connected_servers: int
+    errored_servers: int
+    total_tools: int
+    cache_ttl_seconds: int
+    health_check_running: bool
+
+
+class ServerStatusResponse(BaseModel):
+    """Status of an MCP server."""
+    name: str
+    url: str
+    status: str
+    tool_count: int
+    latency_ms: Optional[float] = None
+    last_check: Optional[str] = None
+    last_error: Optional[str] = None
+
+
+class AllServersStatusResponse(BaseModel):
+    """Status of all user's MCP servers."""
+    servers: List[ServerStatusResponse]
+    cache_ttl_seconds: int
+
+
+@router.get("/manager/stats", response_model=MCPManagerStats)
+async def get_mcp_manager_stats() -> MCPManagerStats:
+    """
+    Get MCP manager statistics.
+
+    Returns overall stats about cached servers, tools, and health checks.
+    """
+    manager = MCPManager.get_instance()
+    stats = manager.get_stats()
+    return MCPManagerStats(**stats)
+
+
+@router.get("/manager/status", response_model=AllServersStatusResponse)
+async def get_mcp_status(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AllServersStatusResponse:
+    """
+    Get status of all user's MCP servers.
+
+    Shows connection status, latency, tool count, and any errors.
+    """
+    manager = MCPManager.get_instance()
+
+    # Load servers from DB to ensure they're registered
+    await manager.get_all_tools_for_user(db, current_user.id)
+
+    # Get status of all servers
+    connections = manager.get_all_server_status(current_user.id)
+
+    servers = []
+    for conn in connections:
+        servers.append(ServerStatusResponse(
+            name=conn.name,
+            url=conn.url,
+            status=conn.status.value,
+            tool_count=conn.tool_count,
+            latency_ms=conn.latency_ms,
+            last_check=conn.last_check.isoformat() if conn.last_check else None,
+            last_error=conn.last_error,
+        ))
+
+    return AllServersStatusResponse(
+        servers=servers,
+        cache_ttl_seconds=manager._cache_ttl,
+    )
+
+
+@router.post("/manager/refresh")
+async def refresh_mcp_cache(
+    server_name: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """
+    Force refresh MCP tool cache.
+
+    Args:
+        server_name: Optional specific server to refresh (None = all)
+    """
+    manager = MCPManager.get_instance()
+
+    if server_name:
+        # Refresh specific server
+        tools = await manager.get_tools(current_user.id, server_name, force_refresh=True)
+        return {
+            "success": True,
+            "server": server_name,
+            "tool_count": len(tools),
+            "message": f"Refreshed cache for {server_name}",
+        }
+    else:
+        # Refresh all
+        all_tools = await manager.get_all_tools_for_user(db, current_user.id, force_refresh=True)
+        total_tools = sum(len(tools) for tools in all_tools.values())
+        return {
+            "success": True,
+            "servers_refreshed": len(all_tools),
+            "total_tools": total_tools,
+            "message": f"Refreshed cache for {len(all_tools)} servers",
+        }
+
+
+@router.post("/manager/health-check/start")
+async def start_mcp_health_checks() -> Dict[str, str]:
+    """
+    Start background MCP health checks.
+
+    Health checks run every 60 seconds and update server status.
+    """
+    manager = MCPManager.get_instance()
+    await manager.start_health_checks()
+    return {"status": "started", "message": "MCP health checks started"}
+
+
+@router.post("/manager/health-check/stop")
+async def stop_mcp_health_checks() -> Dict[str, str]:
+    """
+    Stop background MCP health checks.
+    """
+    manager = MCPManager.get_instance()
+    await manager.stop_health_checks()
+    return {"status": "stopped", "message": "MCP health checks stopped"}
+
+
+class CacheTTLRequest(BaseModel):
+    """Request to set cache TTL."""
+    ttl_seconds: int
+
+
+@router.post("/manager/cache-ttl")
+async def set_mcp_cache_ttl(request: CacheTTLRequest) -> Dict[str, Any]:
+    """
+    Set MCP tool cache TTL.
+
+    Args:
+        ttl_seconds: Cache TTL in seconds (60-3600)
+    """
+    if request.ttl_seconds < 60 or request.ttl_seconds > 3600:
+        raise HTTPException(
+            status_code=400,
+            detail="TTL must be between 60 and 3600 seconds",
+        )
+
+    manager = MCPManager.get_instance()
+    manager.set_cache_ttl(request.ttl_seconds)
+
+    return {
+        "success": True,
+        "cache_ttl_seconds": request.ttl_seconds,
+        "message": f"Cache TTL set to {request.ttl_seconds} seconds",
+    }

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from typing import Any, Dict, List, Optional
+from uuid import UUID
 
 from langchain_core.messages import HumanMessage
 from langchain_core.tools import tool
@@ -26,14 +27,23 @@ from app.services.schedule_parser import parse_schedule, extract_task_from_messa
 from app.graph.nodes.image_node import generate_image_fal, _clean_prompt
 from app.utils.llm import build_chat_llm
 from app.utils.models import RouterCategory
+from app.logger import logger
 
 
 class ToolAgent:
     """Wrapper around LangGraph agent providing tool listing and per-request selection."""
 
-    def __init__(self, settings, credentials: Dict[str, Any] | None = None):
+    def __init__(
+        self,
+        settings,
+        credentials: Dict[str, Any] | None = None,
+        db=None,
+        user_id: Optional[UUID] = None,
+    ):
         self.settings = settings
         self.credentials = credentials or {}
+        self.db = db
+        self.user_id = user_id
         self.llm = build_chat_llm(settings)
         self.weather_service = WeatherService(settings)
         self.rag_service = RAGService(settings)
@@ -229,6 +239,54 @@ class ToolAgent:
             """Create a GitHub issue in the configured repo."""
             last_tool["name"] = "github"
             return await self.github_service.create_issue(title, body)
+
+        @tool("github_commits", return_direct=True)
+        async def github_commits_tool(limit: int = 10, branch: str = "") -> str:
+            """List recent commits in the GitHub repo. Optional: limit (default 10), branch name."""
+            last_tool["name"] = "github"
+            return await self.github_service.list_commits(limit=limit, branch=branch)
+
+        @tool("github_commit_detail", return_direct=True)
+        async def github_commit_detail_tool(sha: str) -> str:
+            """Get details of a specific commit by SHA hash."""
+            last_tool["name"] = "github"
+            return await self.github_service.get_commit(sha)
+
+        @tool("github_prs", return_direct=True)
+        async def github_prs_tool(state: str = "open", limit: int = 10) -> str:
+            """List pull requests. State can be: open, closed, all. Default: open."""
+            last_tool["name"] = "github"
+            return await self.github_service.list_pull_requests(state=state, limit=limit)
+
+        @tool("github_pr_detail", return_direct=True)
+        async def github_pr_detail_tool(pr_number: int) -> str:
+            """Get details of a specific pull request by number."""
+            last_tool["name"] = "github"
+            return await self.github_service.get_pull_request(pr_number)
+
+        @tool("github_repo_info", return_direct=True)
+        async def github_repo_info_tool() -> str:
+            """Get repository information (stars, forks, description, etc.)."""
+            last_tool["name"] = "github"
+            return await self.github_service.get_repo_info()
+
+        @tool("github_branches", return_direct=True)
+        async def github_branches_tool(limit: int = 10) -> str:
+            """List branches in the repository."""
+            last_tool["name"] = "github"
+            return await self.github_service.list_branches(limit=limit)
+
+        @tool("github_contributors", return_direct=True)
+        async def github_contributors_tool(limit: int = 10) -> str:
+            """List top contributors to the repository."""
+            last_tool["name"] = "github"
+            return await self.github_service.list_contributors(limit=limit)
+
+        @tool("github_file", return_direct=True)
+        async def github_file_tool(path: str, branch: str = "") -> str:
+            """Read a file from the repository. Provide file path (e.g., 'README.md')."""
+            last_tool["name"] = "github"
+            return await self.github_service.get_file_content(path=path, branch=branch)
 
         @tool("confluence_search", return_direct=True)
         async def confluence_search_tool(query: str) -> str:
@@ -746,6 +804,236 @@ class ToolAgent:
             except Exception as e:
                 return f"I understood you want to schedule: '{title}' ({parsed.description}), but couldn't create it: {str(e)}"
 
+        @tool("list_tasks", return_direct=True)
+        async def list_tasks_tool(status: str = "active") -> str:
+            """List your scheduled tasks and reminders. Status can be: active, paused, completed, all."""
+            last_tool["name"] = "list_tasks"
+
+            try:
+                from app.db.base import SessionLocal
+                from app.tasks.service import ScheduledTaskService
+
+                db = SessionLocal()
+                try:
+                    service = ScheduledTaskService(db)
+
+                    # Get tasks for current user
+                    status_filter = None if status == "all" else status
+                    tasks, total, _ = service.get_tasks(
+                        user_id=self.user_id,
+                        status=status_filter,
+                        limit=10,
+                    )
+
+                    if not tasks:
+                        return f"You don't have any {status} scheduled tasks."
+
+                    response = f"📋 *Your Scheduled Tasks* ({total} total)\n\n"
+                    for i, task in enumerate(tasks, 1):
+                        status_emoji = {"active": "🟢", "paused": "⏸️", "completed": "✅", "cancelled": "❌"}.get(task.status, "⚪")
+                        response += f"{i}. {status_emoji} *{task.title}*\n"
+                        response += f"   Type: {task.schedule_type} | Status: {task.status}\n"
+                        if task.next_run_at:
+                            next_run = task.next_run_at.strftime("%d %b %Y at %I:%M %p")
+                            response += f"   Next run: {next_run}\n"
+                        if task.description:
+                            response += f"   Note: {task.description[:50]}...\n" if len(task.description) > 50 else f"   Note: {task.description}\n"
+                        response += f"   ID: `{str(task.id)[:8]}`\n\n"
+
+                    return response
+
+                finally:
+                    db.close()
+
+            except Exception as e:
+                logger.error("list_tasks_error", error=str(e))
+                return f"Could not list tasks: {str(e)}"
+
+        @tool("delete_task", return_direct=True)
+        async def delete_task_tool(task_id: str) -> str:
+            """Delete a scheduled task by its ID. Use list_tasks to find the task ID."""
+            last_tool["name"] = "delete_task"
+
+            try:
+                from app.db.base import SessionLocal
+                from app.tasks.service import ScheduledTaskService
+                from uuid import UUID
+
+                db = SessionLocal()
+                try:
+                    service = ScheduledTaskService(db)
+
+                    # Try to parse UUID (support both full and short IDs)
+                    try:
+                        # First try full UUID
+                        parsed_id = UUID(task_id)
+                    except ValueError:
+                        # Try to find task by partial ID
+                        tasks, _, _ = service.get_tasks(user_id=self.user_id, limit=100)
+                        matching = [t for t in tasks if str(t.id).startswith(task_id)]
+                        if len(matching) == 1:
+                            parsed_id = matching[0].id
+                        elif len(matching) > 1:
+                            return f"Multiple tasks match '{task_id}'. Please provide a more specific ID."
+                        else:
+                            return f"No task found with ID '{task_id}'. Use list_tasks to see your tasks."
+
+                    # Get task title before deleting
+                    task = service.get_task(parsed_id, user_id=self.user_id)
+                    if not task:
+                        return f"Task not found or you don't have permission to delete it."
+
+                    task_title = task.title
+
+                    # Delete the task
+                    deleted = service.delete_task(parsed_id, user_id=self.user_id)
+
+                    if deleted:
+                        return f"✅ Deleted task: *{task_title}*"
+                    else:
+                        return f"Could not delete task. Make sure you have permission."
+
+                finally:
+                    db.close()
+
+            except Exception as e:
+                logger.error("delete_task_error", error=str(e))
+                return f"Could not delete task: {str(e)}"
+
+        @tool("pause_task", return_direct=True)
+        async def pause_task_tool(task_id: str) -> str:
+            """Pause a recurring scheduled task. The task won't run until resumed."""
+            last_tool["name"] = "pause_task"
+
+            try:
+                from app.db.base import SessionLocal
+                from app.tasks.service import ScheduledTaskService
+                from uuid import UUID
+
+                db = SessionLocal()
+                try:
+                    service = ScheduledTaskService(db)
+
+                    # Parse task ID
+                    try:
+                        parsed_id = UUID(task_id)
+                    except ValueError:
+                        tasks, _, _ = service.get_tasks(user_id=self.user_id, limit=100)
+                        matching = [t for t in tasks if str(t.id).startswith(task_id)]
+                        if len(matching) == 1:
+                            parsed_id = matching[0].id
+                        elif len(matching) > 1:
+                            return f"Multiple tasks match '{task_id}'. Please provide a more specific ID."
+                        else:
+                            return f"No task found with ID '{task_id}'."
+
+                    task = service.pause_task(parsed_id, user_id=self.user_id)
+
+                    if task:
+                        return f"⏸️ Paused task: *{task.title}*\n\nUse 'resume task {task_id}' to resume it."
+                    else:
+                        return f"Could not pause task. It may already be paused or doesn't exist."
+
+                finally:
+                    db.close()
+
+            except Exception as e:
+                logger.error("pause_task_error", error=str(e))
+                return f"Could not pause task: {str(e)}"
+
+        @tool("resume_task", return_direct=True)
+        async def resume_task_tool(task_id: str) -> str:
+            """Resume a paused scheduled task."""
+            last_tool["name"] = "resume_task"
+
+            try:
+                from app.db.base import SessionLocal
+                from app.tasks.service import ScheduledTaskService
+                from uuid import UUID
+
+                db = SessionLocal()
+                try:
+                    service = ScheduledTaskService(db)
+
+                    # Parse task ID
+                    try:
+                        parsed_id = UUID(task_id)
+                    except ValueError:
+                        tasks, _, _ = service.get_tasks(user_id=self.user_id, status="paused", limit=100)
+                        matching = [t for t in tasks if str(t.id).startswith(task_id)]
+                        if len(matching) == 1:
+                            parsed_id = matching[0].id
+                        elif len(matching) > 1:
+                            return f"Multiple tasks match '{task_id}'. Please provide a more specific ID."
+                        else:
+                            return f"No paused task found with ID '{task_id}'."
+
+                    task = service.resume_task(parsed_id, user_id=self.user_id)
+
+                    if task:
+                        next_run = task.next_run_at.strftime("%d %b %Y at %I:%M %p") if task.next_run_at else "soon"
+                        return f"▶️ Resumed task: *{task.title}*\n\nNext run: {next_run}"
+                    else:
+                        return f"Could not resume task. It may not be paused or doesn't exist."
+
+                finally:
+                    db.close()
+
+            except Exception as e:
+                logger.error("resume_task_error", error=str(e))
+                return f"Could not resume task: {str(e)}"
+
+        @tool("update_task", return_direct=True)
+        async def update_task_tool(task_id: str, title: str = "", description: str = "") -> str:
+            """Update a scheduled task's title or description."""
+            last_tool["name"] = "update_task"
+
+            if not title and not description:
+                return "Please provide a new title or description to update."
+
+            try:
+                from app.db.base import SessionLocal
+                from app.tasks.service import ScheduledTaskService
+                from uuid import UUID
+
+                db = SessionLocal()
+                try:
+                    service = ScheduledTaskService(db)
+
+                    # Parse task ID
+                    try:
+                        parsed_id = UUID(task_id)
+                    except ValueError:
+                        tasks, _, _ = service.get_tasks(user_id=self.user_id, limit=100)
+                        matching = [t for t in tasks if str(t.id).startswith(task_id)]
+                        if len(matching) == 1:
+                            parsed_id = matching[0].id
+                        elif len(matching) > 1:
+                            return f"Multiple tasks match '{task_id}'. Please provide a more specific ID."
+                        else:
+                            return f"No task found with ID '{task_id}'."
+
+                    # Build update kwargs
+                    updates = {}
+                    if title:
+                        updates["title"] = title
+                    if description:
+                        updates["description"] = description
+
+                    task = service.update_task(parsed_id, user_id=self.user_id, **updates)
+
+                    if task:
+                        return f"✏️ Updated task: *{task.title}*"
+                    else:
+                        return f"Could not update task. Make sure it exists and you have permission."
+
+                finally:
+                    db.close()
+
+            except Exception as e:
+                logger.error("update_task_error", error=str(e))
+                return f"Could not update task: {str(e)}"
+
         tools = [
             weather_tool,
             pdf_tool,
@@ -759,6 +1047,14 @@ class ToolAgent:
             slack_post_tool,
             github_search_tool,
             github_create_tool,
+            github_commits_tool,
+            github_commit_detail_tool,
+            github_prs_tool,
+            github_pr_detail_tool,
+            github_repo_info_tool,
+            github_branches_tool,
+            github_contributors_tool,
+            github_file_tool,
             confluence_search_tool,
             custom_mcp_tool,
             web_crawl_tool,
@@ -786,8 +1082,13 @@ class ToolAgent:
             uber_price_tool,
             uber_eta_tool,
             uber_products_tool,
-            # Scheduling tool
+            # Scheduling tools
             schedule_task_tool,
+            list_tasks_tool,
+            delete_task_tool,
+            pause_task_tool,
+            resume_task_tool,
+            update_task_tool,
             # General chat
             chat_tool,
         ]
@@ -807,12 +1108,26 @@ class ToolAgent:
             "gmail": self.gmail_service.available,
             "github_search": self.github_service.available,
             "github_create": self.github_service.available,
+            "github_commits": self.github_service.available,
+            "github_commit_detail": self.github_service.available,
+            "github_prs": self.github_service.available,
+            "github_pr_detail": self.github_service.available,
+            "github_repo_info": self.github_service.available,
+            "github_branches": self.github_service.available,
+            "github_contributors": self.github_service.available,
+            "github_file": self.github_service.available,
             "google_drive_list": self.drive_service.available,
             "uber_profile": self.uber_service.available,
             "uber_history": self.uber_service.available,
             "uber_price": self.uber_service.available,
             "uber_eta": self.uber_service.available,
             "uber_products": self.uber_service.available,
+            # Task tools require user_id
+            "list_tasks": self.user_id is not None,
+            "delete_task": self.user_id is not None,
+            "pause_task": self.user_id is not None,
+            "resume_task": self.user_id is not None,
+            "update_task": self.user_id is not None,
         }
 
         def is_available(name: str) -> bool:
@@ -827,12 +1142,42 @@ class ToolAgent:
             if is_available(tool.name)
         ]
 
+    async def _get_mcp_tools(self) -> List[Any]:
+        """
+        Dynamically discover and load MCP tools from user's configured servers.
+
+        Returns:
+            List of LangChain tools from MCP servers
+        """
+        if not self.db or not self.user_id:
+            return []
+
+        try:
+            from app.mcp.langchain_bridge import get_mcp_tools_for_user
+            mcp_tools = await get_mcp_tools_for_user(self.db, self.user_id)
+            logger.info("mcp_tools_loaded", count=len(mcp_tools), user_id=str(self.user_id))
+            return mcp_tools
+        except Exception as e:
+            logger.warning("mcp_tools_load_failed", error=str(e))
+            return []
+
     async def invoke(self, message: str, allowed_tools: List[str] | None = None) -> Dict[str, Any]:
         """
         Run the agent with an optional subset of tools.
+
+        Dynamically loads MCP tools from user's configured servers and
+        combines them with built-in tools.
         """
         tools, last_tool = self._build_tools()
         tool_map = {t.name: t for t in tools}
+
+        # Dynamically load MCP tools from user's configured servers
+        mcp_tools = await self._get_mcp_tools()
+        if mcp_tools:
+            tools.extend(mcp_tools)
+            for t in mcp_tools:
+                tool_map[t.name] = t
+            logger.info("mcp_tools_added_to_agent", count=len(mcp_tools))
 
         if allowed_tools:
             active_tools = [t for t in tools if t.name in allowed_tools]
@@ -874,6 +1219,11 @@ class ToolAgent:
         }
 
 
-def build_tool_agent(settings, credentials: Dict[str, Any] | None = None):
+def build_tool_agent(
+    settings,
+    credentials: Dict[str, Any] | None = None,
+    db=None,
+    user_id: Optional[UUID] = None,
+):
     """Factory for ToolAgent to keep existing imports simple."""
-    return ToolAgent(settings, credentials=credentials)
+    return ToolAgent(settings, credentials=credentials, db=db, user_id=user_id)

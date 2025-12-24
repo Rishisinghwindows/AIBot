@@ -72,7 +72,7 @@ class ChatService:
         structured_data = None
         media_url = None
         try:
-            agent = build_tool_agent(self.settings, credentials=credentials)
+            agent = build_tool_agent(self.settings, credentials=credentials, db=self.db, user_id=user.id)
             result = await agent.invoke(message, allowed_tools=allowed_tools)
             ai_content = result.get("response", "I apologize, but I couldn't process your request.")
             route_log = result.get("route_log", [])

@@ -260,7 +260,7 @@ async def list_tools(
 
     service = ChatService(settings, db)
     credentials = service._load_credentials(user)  # internal helper for availability
-    agent = build_tool_agent(settings, credentials=credentials)
+    agent = build_tool_agent(settings, credentials=credentials, db=db, user_id=user.id)
     tools = agent.list_tools()
     return [ToolInfo(name=t["name"], description=t["description"]) for t in tools]
 
@@ -329,8 +329,8 @@ async def generate_sse_response(
     credentials = service._load_credentials(user)
 
     try:
-        # Build agent and invoke
-        agent = build_tool_agent(settings, credentials=credentials)
+        # Build agent and invoke (pass db and user_id for MCP tool discovery)
+        agent = build_tool_agent(settings, credentials=credentials, db=db, user_id=user.id)
         result = await agent.invoke(message, allowed_tools=allowed_tools)
 
         ai_content = result.get("response", "I apologize, but I couldn't process your request.")

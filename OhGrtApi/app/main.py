@@ -281,6 +281,15 @@ async def startup_event() -> None:
     # Start the task scheduler
     await start_scheduler()
 
+    # Start MCP health checks (background monitoring)
+    try:
+        from app.mcp.manager import MCPManager
+        mcp_manager = MCPManager.get_instance()
+        await mcp_manager.start_health_checks()
+        logger.info("mcp_health_checks_started")
+    except Exception as e:
+        logger.warning("mcp_health_checks_failed", error=str(e))
+
     logger.info("app_startup", version="2.1.0")
 
 
@@ -288,6 +297,16 @@ async def startup_event() -> None:
 async def shutdown_event() -> None:
     """Shutdown handler - stop background services."""
     await stop_scheduler()
+
+    # Stop MCP health checks
+    try:
+        from app.mcp.manager import MCPManager
+        mcp_manager = MCPManager.get_instance()
+        await mcp_manager.stop_health_checks()
+        logger.info("mcp_health_checks_stopped")
+    except Exception as e:
+        logger.warning("mcp_health_checks_stop_failed", error=str(e))
+
     logger.info("app_shutdown")
 
 
