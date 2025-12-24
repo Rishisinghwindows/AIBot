@@ -1,16 +1,9 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback, useRef, useMemo } from 'react';
+import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback, useRef } from 'react';
 import { User, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
-import { auth, isFirebaseConfigured } from '@/lib/firebase';
+import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
-
-// SECURITY NOTE: Tokens are stored in localStorage which is vulnerable to XSS attacks.
-// For improved security, consider:
-// 1. Using httpOnly cookies via API routes for token storage
-// 2. Implementing token refresh via secure API endpoints
-// 3. Adding Content Security Policy headers (done in next.config.mjs)
-// See: https://owasp.org/www-community/attacks/xss/
 
 interface UserProfile {
   id: string;
@@ -26,6 +19,7 @@ interface AuthContextType {
   loading: boolean;
   login: () => Promise<void>;
   logout: () => Promise<void>;
+  refreshAccessToken: () => Promise<string | null>;
   idToken: string | null;
   accessToken: string | null;
   refreshToken: string | null;
@@ -119,13 +113,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    // If Firebase is not configured, just finish loading
-    if (!isFirebaseConfigured || !auth) {
-      console.warn("[Auth] Firebase not configured - running in anonymous mode");
-      setLoading(false);
-      return;
-    }
-
     let authStateReceived = false;
 
     // Timeout fallback: if Firebase takes too long to initialize, stop loading
@@ -195,10 +182,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [fetchProfile]);
 
   const login = async () => {
-    if (!isFirebaseConfigured || !auth) {
-      console.error("[Auth] Firebase not configured - cannot login");
-      return;
-    }
     setLoading(true);
     try {
       const provider = new GoogleAuthProvider();
@@ -228,9 +211,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      if (auth) {
-        await signOut(auth);
-      }
+      await signOut(auth);
       setCurrentProfile(null);
       setAccessToken(null);
       setRefreshToken(null);
@@ -248,23 +229,83 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Memoize context value to prevent unnecessary re-renders
-  const value = useMemo(
-    () => ({
+  // Refresh the backend access token using refresh token
+  const refreshAccessToken = useCallback(async (): Promise<string | null> => {
+    const currentRefreshToken = refreshToken || (typeof window !== "undefined" ? localStorage.getItem("refresh_token") : null);
+
+    if (!currentRefreshToken) {
+      console.log("[Auth] No refresh token available, redirecting to login");
+      router.push('/login');
+      return null;
+    }
+
+    try {
+      console.log("[Auth] Attempting to refresh access token...");
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/refresh`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ refresh_token: currentRefreshToken }),
+      });
+
+      if (!response.ok) {
+        console.error("[Auth] Token refresh failed, status:", response.status);
+        // Refresh token is invalid or expired - clear everything and redirect to login
+        setAccessToken(null);
+        setRefreshToken(null);
+        setCurrentProfile(null);
+        profileFetched.current = false;
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("access_token");
+          localStorage.removeItem("refresh_token");
+          localStorage.removeItem("firebase_id_token");
+        }
+        // Sign out of Firebase too
+        try {
+          await signOut(auth);
+        } catch (e) {
+          console.error("[Auth] Error signing out of Firebase:", e);
+        }
+        router.push('/login');
+        return null;
+      }
+
+      const data = await response.json();
+      console.log("[Auth] Token refresh successful");
+
+      setAccessToken(data.access_token);
+      if (data.refresh_token) {
+        setRefreshToken(data.refresh_token);
+      }
+
+      if (typeof window !== "undefined") {
+        localStorage.setItem("access_token", data.access_token);
+        if (data.refresh_token) {
+          localStorage.setItem("refresh_token", data.refresh_token);
+        }
+      }
+
+      return data.access_token;
+    } catch (error) {
+      console.error("[Auth] Error refreshing token:", error);
+      router.push('/login');
+      return null;
+    }
+  }, [refreshToken, router]);
+
+  return (
+    <AuthContext.Provider value={{
       currentUser,
       currentProfile,
       loading,
       login,
       logout,
+      refreshAccessToken,
       idToken,
       accessToken,
       refreshToken,
-    }),
-    [currentUser, currentProfile, loading, login, logout, idToken, accessToken, refreshToken]
-  );
-
-  return (
-    <AuthContext.Provider value={value}>
+    }}>
       {children}
     </AuthContext.Provider>
   );

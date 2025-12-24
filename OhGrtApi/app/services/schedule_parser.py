@@ -14,6 +14,14 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional, Tuple
 from dataclasses import dataclass
 
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:
+    from backports.zoneinfo import ZoneInfo
+
+# Default timezone for parsing (IST for Indian users)
+DEFAULT_TIMEZONE = ZoneInfo("Asia/Kolkata")
+
 
 @dataclass
 class ParsedSchedule:
@@ -47,7 +55,7 @@ def parse_time(time_str: str) -> Tuple[int, int]:
     return (hour, minute)
 
 
-def parse_schedule(text: str) -> ParsedSchedule:
+def parse_schedule(text: str, tz: ZoneInfo = DEFAULT_TIMEZONE) -> ParsedSchedule:
     """
     Parse natural language schedule expression.
 
@@ -57,9 +65,14 @@ def parse_schedule(text: str) -> ParsedSchedule:
     - "in 2 hours" -> one_time
     - "every monday at 9am" -> weekly cron
     - "daily at 8:30 am" -> daily cron
+
+    Args:
+        text: Natural language schedule expression
+        tz: Timezone for interpreting times (default: Asia/Kolkata)
     """
     text_lower = text.lower().strip()
-    now = datetime.now(timezone.utc)
+    # Use local timezone for "now" so times are interpreted correctly
+    now = datetime.now(tz)
 
     # Pattern: "in X hours/minutes"
     in_match = re.search(r'in\s+(\d+)\s*(hour|minute|min|hr)s?', text_lower)

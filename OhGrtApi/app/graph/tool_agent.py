@@ -730,10 +730,9 @@ class ToolAgent:
         # ==================== SCHEDULING TOOL ====================
 
         @tool("schedule_task", return_direct=True)
-        async def schedule_task_tool(message: str, session_id: str = "", user_id: str = "") -> str:
+        async def schedule_task_tool(message: str) -> str:
             """Schedule a reminder, alert, or recurring task from natural language.
-            Examples: 'remind me to check portfolio at 12 pm', 'schedule alert every day at 9am'.
-            Requires either session_id (for anonymous) or user_id (for authenticated users)."""
+            Examples: 'remind me to check portfolio at 12 pm', 'schedule alert every day at 9am'."""
             last_tool["name"] = "schedule_task"
 
             # Parse the schedule from natural language
@@ -744,27 +743,16 @@ class ToolAgent:
             try:
                 from app.db.base import SessionLocal
                 from app.tasks.service import ScheduledTaskService
-                from uuid import UUID
 
                 db = SessionLocal()
                 try:
                     service = ScheduledTaskService(db)
 
-                    # Determine ownership
-                    task_user_id = None
-                    task_session_id = None
+                    # Use user_id from the ToolAgent instance (captured via closure)
+                    task_user_id = self.user_id
 
-                    if user_id:
-                        try:
-                            task_user_id = UUID(user_id)
-                        except ValueError:
-                            pass
-
-                    if not task_user_id and session_id:
-                        task_session_id = session_id
-
-                    if not task_user_id and not task_session_id:
-                        return "I need your session to create a scheduled task. Please try again."
+                    if not task_user_id:
+                        return "Please sign in to create scheduled tasks. Anonymous scheduling is not supported."
 
                     # Create the task
                     task = service.create_task(
@@ -773,7 +761,6 @@ class ToolAgent:
                         task_type="scheduled_query" if agent_prompt else "reminder",
                         schedule_type=parsed.schedule_type,
                         user_id=task_user_id,
-                        session_id=task_session_id,
                         scheduled_at=parsed.scheduled_at,
                         cron_expression=parsed.cron_expression,
                         task_timezone="Asia/Kolkata",  # Default to IST for Indian users

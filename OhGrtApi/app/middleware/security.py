@@ -50,7 +50,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     }
 
     EXEMPT_PREFIXES: tuple = (
-        "/docs", "/redoc", "/web", "/whatsapp", "/pdf", "/auth", "/mcp", "/chat",
+        "/docs", "/redoc", "/web", "/whatsapp", "/pdf", "/auth", "/mcp", "/chat", "/tasks",
         # OAuth provider endpoints
         "/gmail", "/slack", "/jira", "/github", "/uber",
     )

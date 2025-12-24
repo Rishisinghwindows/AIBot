@@ -34,7 +34,9 @@ except Exception:
     # Database not configured, engine will be None
     pass
 
+# Create Base with schema explicitly set to ensure all operations use the correct schema
 Base = declarative_base()
+Base.metadata.schema = settings.postgres_schema
 
 
 def get_db() -> Generator[Session, None, None]:

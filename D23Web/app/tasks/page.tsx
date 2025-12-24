@@ -2,6 +2,8 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
+import authFetch from "@/lib/auth_fetch";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -22,10 +24,12 @@ import {
   Clock,
   CheckCircle,
   AlertCircle,
+  LogIn,
 } from "lucide-react";
 
 export default function TasksPage() {
   const router = useRouter();
+  const { currentUser, accessToken, loading: authLoading, login } = useAuth();
   const [tasks, setTasks] = useState<ScheduledTask[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -36,13 +40,17 @@ export default function TasksPage() {
 
   const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-  // Get or create session ID
+  // Check if user is authenticated
+  const isAuthenticated = !!currentUser && !!accessToken;
+
+  // Get or create session ID (for anonymous users)
   useEffect(() => {
+    if (isAuthenticated) return; // Don't need session for authenticated users
+
     const storedSessionId = localStorage.getItem("ohgrt_session_id");
     if (storedSessionId) {
       setSessionId(storedSessionId);
     } else {
-      // Fetch a new session if we don't have one
       fetch(`${apiBase}/web/session`, { method: "POST" })
         .then((res) => res.json())
         .then((data) => {
@@ -51,53 +59,94 @@ export default function TasksPage() {
         })
         .catch((err) => console.error("Failed to create session:", err));
     }
-  }, [apiBase]);
+  }, [apiBase, isAuthenticated]);
 
   // Fetch tasks
   const fetchTasks = useCallback(async () => {
-    if (!sessionId) return;
+    // Wait for auth to finish loading
+    if (authLoading) return;
 
-    setIsLoading(true);
-    setError(null);
+    // For authenticated users, use the authenticated endpoint
+    if (isAuthenticated) {
+      setIsLoading(true);
+      setError(null);
 
-    try {
-      const params = new URLSearchParams({ session_id: sessionId });
-      if (statusFilter !== "all") {
-        params.append("status", statusFilter);
+      try {
+        const params = new URLSearchParams();
+        if (statusFilter !== "all") {
+          params.append("status", statusFilter);
+        }
+
+        const response = await authFetch(
+          `${apiBase}/tasks${params.toString() ? `?${params.toString()}` : ""}`,
+          { method: "GET" }
+        );
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch tasks");
+        }
+
+        const data = await response.json();
+        setTasks(data.tasks || []);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "An error occurred");
+      } finally {
+        setIsLoading(false);
       }
+    } else if (sessionId) {
+      // For anonymous users, use session-based endpoint
+      setIsLoading(true);
+      setError(null);
 
-      const response = await fetch(`${apiBase}/web/tasks?${params.toString()}`);
-      if (!response.ok) {
-        throw new Error("Failed to fetch tasks");
+      try {
+        const params = new URLSearchParams({ session_id: sessionId });
+        if (statusFilter !== "all") {
+          params.append("status", statusFilter);
+        }
+
+        const response = await fetch(`${apiBase}/web/tasks?${params.toString()}`);
+        if (!response.ok) {
+          throw new Error("Failed to fetch tasks");
+        }
+
+        const data = await response.json();
+        setTasks(data.tasks || []);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "An error occurred");
+      } finally {
+        setIsLoading(false);
       }
-
-      const data = await response.json();
-      setTasks(data.tasks || []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
-    } finally {
-      setIsLoading(false);
     }
-  }, [apiBase, sessionId, statusFilter]);
+  }, [apiBase, sessionId, statusFilter, isAuthenticated, authLoading]);
 
   useEffect(() => {
-    if (sessionId) {
+    if (!authLoading && (isAuthenticated || sessionId)) {
       fetchTasks();
     }
-  }, [sessionId, fetchTasks]);
+  }, [authLoading, isAuthenticated, sessionId, fetchTasks]);
 
   // Create task
   const handleCreateTask = async (taskData: CreateTaskData) => {
-    if (!sessionId) return;
+    if (isAuthenticated) {
+      const response = await authFetch(`${apiBase}/tasks`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(taskData),
+      });
 
-    const response = await fetch(`${apiBase}/web/tasks?session_id=${sessionId}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(taskData),
-    });
+      if (!response.ok) {
+        throw new Error("Failed to create task");
+      }
+    } else if (sessionId) {
+      const response = await fetch(`${apiBase}/web/tasks?session_id=${sessionId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(taskData),
+      });
 
-    if (!response.ok) {
-      throw new Error("Failed to create task");
+      if (!response.ok) {
+        throw new Error("Failed to create task");
+      }
     }
 
     await fetchTasks();
@@ -105,43 +154,61 @@ export default function TasksPage() {
 
   // Pause task
   const handlePauseTask = async (taskId: string) => {
-    if (!sessionId) return;
-
-    const response = await fetch(
-      `${apiBase}/tasks/${taskId}/pause?session_id=${sessionId}`,
-      { method: "POST" }
-    );
-
-    if (response.ok) {
-      fetchTasks();
+    if (isAuthenticated) {
+      const response = await authFetch(`${apiBase}/tasks/${taskId}/pause`, {
+        method: "POST",
+      });
+      if (response.ok) {
+        fetchTasks();
+      }
+    } else if (sessionId) {
+      const response = await fetch(
+        `${apiBase}/tasks/${taskId}/pause?session_id=${sessionId}`,
+        { method: "POST" }
+      );
+      if (response.ok) {
+        fetchTasks();
+      }
     }
   };
 
   // Resume task
   const handleResumeTask = async (taskId: string) => {
-    if (!sessionId) return;
-
-    const response = await fetch(
-      `${apiBase}/tasks/${taskId}/resume?session_id=${sessionId}`,
-      { method: "POST" }
-    );
-
-    if (response.ok) {
-      fetchTasks();
+    if (isAuthenticated) {
+      const response = await authFetch(`${apiBase}/tasks/${taskId}/resume`, {
+        method: "POST",
+      });
+      if (response.ok) {
+        fetchTasks();
+      }
+    } else if (sessionId) {
+      const response = await fetch(
+        `${apiBase}/tasks/${taskId}/resume?session_id=${sessionId}`,
+        { method: "POST" }
+      );
+      if (response.ok) {
+        fetchTasks();
+      }
     }
   };
 
   // Delete task
   const handleDeleteTask = async (taskId: string) => {
-    if (!sessionId) return;
-
-    const response = await fetch(
-      `${apiBase}/web/tasks/${taskId}?session_id=${sessionId}`,
-      { method: "DELETE" }
-    );
-
-    if (response.ok) {
-      fetchTasks();
+    if (isAuthenticated) {
+      const response = await authFetch(`${apiBase}/tasks/${taskId}`, {
+        method: "DELETE",
+      });
+      if (response.ok) {
+        fetchTasks();
+      }
+    } else if (sessionId) {
+      const response = await fetch(
+        `${apiBase}/web/tasks/${taskId}?session_id=${sessionId}`,
+        { method: "DELETE" }
+      );
+      if (response.ok) {
+        fetchTasks();
+      }
     }
   };
 
@@ -155,6 +222,15 @@ export default function TasksPage() {
   const activeCount = tasks.filter((t) => t.status === "active").length;
   const pausedCount = tasks.filter((t) => t.status === "paused").length;
   const completedCount = tasks.filter((t) => t.status === "completed").length;
+
+  // Show loading while auth is initializing
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -177,19 +253,49 @@ export default function TasksPage() {
                   Scheduled Tasks
                 </h1>
                 <p className="text-sm text-muted-foreground">
-                  Manage your reminders and automated tasks
+                  {isAuthenticated
+                    ? "Manage your reminders and automated tasks"
+                    : "Sign in to create and manage scheduled tasks"}
                 </p>
               </div>
             </div>
-            <Button onClick={() => setShowCreateDialog(true)} className="gap-2">
-              <Plus className="h-4 w-4" />
-              New Task
-            </Button>
+            <div className="flex items-center gap-2">
+              {!isAuthenticated && (
+                <Button variant="outline" onClick={login} className="gap-2">
+                  <LogIn className="h-4 w-4" />
+                  Sign In
+                </Button>
+              )}
+              {isAuthenticated && (
+                <Button onClick={() => setShowCreateDialog(true)} className="gap-2">
+                  <Plus className="h-4 w-4" />
+                  New Task
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       </header>
 
       <main className="container mx-auto px-4 py-6">
+        {/* Show sign-in prompt for anonymous users */}
+        {!isAuthenticated && (
+          <div className="mb-6 p-4 rounded-lg bg-amber-500/10 border border-amber-500/20">
+            <div className="flex items-center gap-3">
+              <AlertCircle className="h-5 w-5 text-amber-500" />
+              <div>
+                <p className="font-medium text-foreground">Sign in required</p>
+                <p className="text-sm text-muted-foreground">
+                  Scheduled tasks created via chat are linked to your account. Sign in to view and manage them.
+                </p>
+              </div>
+              <Button variant="outline" onClick={login} size="sm" className="ml-auto">
+                Sign In
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Stats */}
         <div className="grid grid-cols-3 gap-4 mb-6">
           <div className="p-4 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
@@ -264,9 +370,11 @@ export default function TasksPage() {
             <p className="text-muted-foreground mb-4">
               {searchQuery || statusFilter !== "all"
                 ? "Try adjusting your filters"
-                : "Create your first task to get started"}
+                : isAuthenticated
+                  ? "Create your first task to get started"
+                  : "Sign in and create tasks via chat"}
             </p>
-            {!searchQuery && statusFilter === "all" && (
+            {!searchQuery && statusFilter === "all" && isAuthenticated && (
               <Button onClick={() => setShowCreateDialog(true)}>
                 <Plus className="h-4 w-4 mr-2" />
                 Create Task
