@@ -253,7 +253,7 @@ function Header() {
               </button>
               <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                 <Link
-                  href="https://api.whatsapp.com/send/?phone=%2B919934438606&text=Hey+D23%21+What+can+you+do%3F&type=phone_number&app_absent=0"
+                  href="https://wa.me/918548819349?text=Hey%20D23%20AI%21%20What%20can%20you%20do%3F"
                   target="_blank"
                   className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-green-500 to-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-green-500/25"
                 >
@@ -340,7 +340,7 @@ function HeroSection() {
           >
             <motion.div whileHover={{ scale: 1.05, y: -2 }} whileTap={{ scale: 0.95 }}>
               <Link
-                href="https://api.whatsapp.com/send/?phone=%2B919934438606&text=Hey+D23%21+What+can+you+do%3F&type=phone_number&app_absent=0"
+                href="https://wa.me/918548819349?text=Hey%20D23%20AI%21%20What%20can%20you%20do%3F"
                 target="_blank"
                 className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-green-500 to-green-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-green-500/30"
               >
@@ -758,7 +758,7 @@ function CTASection() {
                     <p className="text-xs text-gray-500">Chat on your favorite app</p>
                   </div>
                   <Link
-                    href="https://api.whatsapp.com/send/?phone=%2B919934438606&text=Hey+D23%21+What+can+you+do%3F&type=phone_number&app_absent=0"
+                    href="https://wa.me/918548819349?text=Hey%20D23%20AI%21%20What%20can%20you%20do%3F"
                     target="_blank"
                     className="w-full text-center py-2 rounded-lg bg-gradient-to-r from-green-500 to-green-600 text-white text-sm font-semibold shadow-md"
                   >
@@ -830,7 +830,7 @@ function Footer() {
               </div>
               <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                 <Link
-                  href="https://api.whatsapp.com/send/?phone=%2B919934438606&text=Hey+D23%21+What+can+you+do%3F&type=phone_number&app_absent=0"
+                  href="https://wa.me/918548819349?text=Hey%20D23%20AI%21%20What%20can%20you%20do%3F"
                   target="_blank"
                   className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-green-500 to-emerald-600 px-6 py-3 text-sm font-semibold text-white shadow-lg"
                 >

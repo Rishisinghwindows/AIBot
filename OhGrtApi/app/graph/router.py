@@ -9,7 +9,7 @@ from app.utils.models import RouterCategory
 
 
 class RouterPrediction(BaseModel):
-    category: RouterCategory = Field(description="One of: weather, pdf, sql, gmail, chat")
+    category: RouterCategory = Field(description="One of: weather, pdf, sql, gmail, image, chat")
 
 
 class RouterAgent:
@@ -18,7 +18,16 @@ class RouterAgent:
         self.parser = JsonOutputParser(pydantic_object=RouterPrediction)
         self.prompt = ChatPromptTemplate.from_template(
             """You are a routing agent.
-Classify the user request into exactly one of: [weather, pdf, sql, gmail, chat].
+Classify the user request into exactly one of: [weather, pdf, sql, gmail, image, chat].
+
+Categories:
+- weather: Weather queries (temperature, forecast, etc.)
+- pdf: Document/PDF queries
+- sql: Database queries
+- gmail: Email related queries
+- image: Image generation requests (create/generate/make image/picture/photo)
+- chat: General conversation
+
 Return JSON only in this format:
 {format_instructions}
 
@@ -46,6 +55,8 @@ User request: {message}"""
                 return RouterCategory.sql
             if "gmail" in text or "email" in text or "inbox" in text:
                 return RouterCategory.gmail
+            if any(w in text for w in ["generate image", "create image", "make image", "draw", "picture of", "photo of", "generate a", "create a picture"]):
+                return RouterCategory.image
             return RouterCategory.chat
 
         logger.info(f"router_classification: category={category}")

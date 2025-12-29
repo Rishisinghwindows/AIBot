@@ -88,7 +88,7 @@ export function ChatSidebar({
         </Button>
       </div>
 
-      <ScrollArea className="flex-1 px-2">
+      <ScrollArea className="flex-1 px-2 h-full overflow-hidden">
         <div className="space-y-1 pb-4">
           {isLoadingConversations ? (
             <div className="flex justify-center py-8">

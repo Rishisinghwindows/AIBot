@@ -239,7 +239,7 @@ function Header() {
 
           <MagneticButton>
             <Link
-              href="https://api.whatsapp.com/send/?phone=%2B919934438606&text=Hey+D23%21+What+can+you+do%3F&type=phone_number&app_absent=0"
+              href="https://wa.me/918548819349?text=Hey%20D23%20AI%21%20What%20can%20you%20do%3F"
               target="_blank"
               className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white text-sm font-medium shadow-lg shadow-violet-500/25 hover:shadow-violet-500/40 transition-shadow"
             >
@@ -327,7 +327,7 @@ function HeroSection() {
         >
           <MagneticButton>
             <Link
-              href="https://api.whatsapp.com/send/?phone=%2B919934438606&text=Hey+D23%21+What+can+you+do%3F&type=phone_number&app_absent=0"
+              href="https://wa.me/918548819349?text=Hey%20D23%20AI%21%20What%20can%20you%20do%3F"
               target="_blank"
               className="group flex items-center gap-3 px-8 py-4 rounded-full bg-gradient-to-r from-violet-600 via-fuchsia-600 to-pink-600 text-white font-semibold shadow-2xl shadow-violet-500/30 hover:shadow-violet-500/50 transition-all"
             >
@@ -417,8 +417,20 @@ function HeroSection() {
   )
 }
 
-// ============== VIDEO SECTION (FROM V2) ==============
+// ============== VIDEO SECTION ==============
 function VideoSection() {
+  const videoRef = useRef<HTMLVideoElement>(null)
+
+  useEffect(() => {
+    const video = videoRef.current
+    if (video) {
+      video.muted = true
+      video.play().catch(() => {
+        // Autoplay failed, user interaction needed
+      })
+    }
+  }, [])
+
   return (
     <section className="py-24 px-6">
       <div className="max-w-5xl mx-auto">
@@ -437,12 +449,14 @@ function VideoSection() {
               <div className="p-2">
                 <div className="group relative rounded-xl overflow-hidden cursor-pointer">
                   <video
+                    ref={videoRef}
                     className="w-full aspect-video object-cover rounded-xl"
                     src="/puch/Puch_AI_Launch.mp4"
                     autoPlay
                     loop
                     muted
                     playsInline
+                    preload="metadata"
                   />
                   <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-100 group-hover:opacity-0 transition-opacity duration-500">
                     <div className="flex items-center gap-4">
@@ -815,7 +829,7 @@ function CTASection() {
               >
                 <MagneticButton>
                   <Link
-                    href="https://api.whatsapp.com/send/?phone=%2B919934438606&text=Hey+D23%21+What+can+you+do%3F&type=phone_number&app_absent=0"
+                    href="https://wa.me/918548819349?text=Hey%20D23%20AI%21%20What%20can%20you%20do%3F"
                     target="_blank"
                     className="flex items-center gap-3 px-8 py-4 rounded-full bg-white text-violet-600 font-semibold shadow-2xl hover:bg-zinc-100 transition-colors"
                   >
@@ -861,7 +875,7 @@ function Footer() {
 
             <MagneticButton>
               <Link
-                href="https://api.whatsapp.com/send/?phone=%2B919934438606&text=Hey+D23%21+What+can+you+do%3F&type=phone_number&app_absent=0"
+                href="https://wa.me/918548819349?text=Hey%20D23%20AI%21%20What%20can%20you%20do%3F"
                 target="_blank"
                 className="flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white font-medium shadow-lg shadow-violet-500/25"
               >

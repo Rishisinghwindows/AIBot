@@ -120,6 +120,8 @@ async def send_message(
         allowed_tools=request.tools,
     )
 
+    # Extract intent, structured_data, and media_url from metadata
+    assistant_metadata = assistant_msg.message_metadata or {}
     return ChatSendResponse(
         conversation_id=conv_id,
         user_message=ChatMessageResponse(
@@ -133,8 +135,11 @@ async def send_message(
             id=assistant_msg.id,
             role=assistant_msg.role,
             content=assistant_msg.content,
-            message_metadata=assistant_msg.message_metadata or {},
+            message_metadata=assistant_metadata,
             created_at=assistant_msg.created_at,
+            media_url=assistant_metadata.get("media_url"),
+            intent=assistant_metadata.get("intent") or assistant_metadata.get("category"),
+            structured_data=assistant_metadata.get("structured_data"),
         ),
     )
 
@@ -164,17 +169,21 @@ async def get_history(
         before=before,
     )
 
+    def build_message_response(m):
+        metadata = m.message_metadata or {}
+        return ChatMessageResponse(
+            id=m.id,
+            role=m.role,
+            content=m.content,
+            message_metadata=metadata,
+            created_at=m.created_at,
+            media_url=metadata.get("media_url") if m.role == "assistant" else None,
+            intent=metadata.get("intent") or metadata.get("category") if m.role == "assistant" else None,
+            structured_data=metadata.get("structured_data") if m.role == "assistant" else None,
+        )
+
     return ChatHistoryResponse(
-        messages=[
-            ChatMessageResponse(
-                id=m.id,
-                role=m.role,
-                content=m.content,
-                message_metadata=m.message_metadata or {},
-                created_at=m.created_at,
-            )
-            for m in messages
-        ],
+        messages=[build_message_response(m) for m in messages],
         has_more=has_more,
     )
 
@@ -251,7 +260,7 @@ async def list_tools(
 
     service = ChatService(settings, db)
     credentials = service._load_credentials(user)  # internal helper for availability
-    agent = build_tool_agent(settings, credentials=credentials)
+    agent = build_tool_agent(settings, credentials=credentials, db=db, user_id=user.id)
     tools = agent.list_tools()
     return [ToolInfo(name=t["name"], description=t["description"]) for t in tools]
 
@@ -320,14 +329,16 @@ async def generate_sse_response(
     credentials = service._load_credentials(user)
 
     try:
-        # Build agent and invoke
-        agent = build_tool_agent(settings, credentials=credentials)
+        # Build agent and invoke (pass db and user_id for MCP tool discovery)
+        agent = build_tool_agent(settings, credentials=credentials, db=db, user_id=user.id)
         result = await agent.invoke(message, allowed_tools=allowed_tools)
 
         ai_content = result.get("response", "I apologize, but I couldn't process your request.")
         route_log = result.get("route_log", [])
         category = result.get("category", "chat")
         media_url = result.get("media_url")
+        intent = result.get("intent") or category
+        structured_data = result.get("structured_data")
 
         # Send content in chunks for streaming effect
         chunk_size = 50
@@ -336,17 +347,19 @@ async def generate_sse_response(
             yield f"event: chunk\ndata: {json.dumps({'content': chunk})}\n\n"
             await asyncio.sleep(0.02)  # Small delay for streaming effect
 
-        # Send metadata
+        # Send metadata with intent and structured_data for rich card rendering
         metadata = {
             "category": category,
             "route_log": route_log if isinstance(route_log, list) else [route_log],
+            "intent": intent,
+            "structured_data": structured_data,
         }
         if media_url:
             metadata["media_url"] = media_url
 
         yield f"event: metadata\ndata: {json.dumps(metadata)}\n\n"
 
-        # Store assistant message
+        # Store assistant message with structured data
         assistant_msg = ChatMessage(
             user_id=user.id,
             conversation_id=conv_id,
@@ -356,6 +369,8 @@ async def generate_sse_response(
                 "category": category,
                 "route_log": ", ".join(route_log) if isinstance(route_log, list) else str(route_log),
                 "media_url": media_url,
+                "intent": intent,
+                "structured_data": structured_data,
             },
         )
         db.add(assistant_msg)

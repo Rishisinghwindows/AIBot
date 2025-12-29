@@ -108,8 +108,8 @@ export function ChatArea({
   }));
 
   return (
-    <div className="flex-1 overflow-hidden flex flex-col relative">
-      <ScrollArea ref={chatAreaRef} className="flex-1">
+    <div className="flex-1 overflow-hidden flex flex-col relative h-full">
+      <ScrollArea ref={chatAreaRef} className="flex-1 h-full [&>[data-slot=scroll-area-viewport]]:h-full [&>[data-slot=scroll-area-viewport]]:max-h-full">
         <div className="max-w-3xl mx-auto px-4 py-6">
           {isFetchingMessages ? (
             <div className="flex justify-center py-8">

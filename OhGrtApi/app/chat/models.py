@@ -28,6 +28,9 @@ class ChatMessageResponse(BaseModel):
     content: str
     message_metadata: Dict[str, Any] = {}
     created_at: datetime
+    media_url: Optional[str] = None  # For image responses
+    intent: Optional[str] = None  # Detected intent for rich UI cards
+    structured_data: Optional[Dict[str, Any]] = None  # Structured data for card rendering
 
     class Config:
         from_attributes = True

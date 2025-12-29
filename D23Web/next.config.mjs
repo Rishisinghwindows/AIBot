@@ -1,20 +1,32 @@
 /** @type {import('next').NextConfig} */
 
 // Content Security Policy configuration
+// SECURITY: In production, remove 'unsafe-inline' and 'unsafe-eval' and use nonces instead
+const isDev = process.env.NODE_ENV === 'development'
+
 const cspDirectives = {
   'default-src': ["'self'"],
   'script-src': [
     "'self'",
-    "'unsafe-inline'",
-    "'unsafe-eval'", // needed for Next.js dev
+    // Only allow unsafe-inline and unsafe-eval in development
+    ...(isDev ? ["'unsafe-inline'", "'unsafe-eval'"] : []),
     "https://va.vercel-scripts.com", // Vercel Analytics
     "https://vercel.live", // Vercel Live
     "https://apis.google.com", // Google Sign-In
     "https://www.gstatic.com", // Google scripts
     "https://accounts.google.com", // Google accounts
   ],
-  'style-src': ["'self'", "'unsafe-inline'"], // inline styles for Tailwind
-  'img-src': ["'self'", "data:", "blob:", "https:"],
+  'style-src': ["'self'", "'unsafe-inline'"], // inline styles for Tailwind (required)
+  // SECURITY: Restrict img-src to specific trusted domains instead of all https
+  'img-src': [
+    "'self'",
+    "data:",
+    "blob:",
+    "https://lh3.googleusercontent.com", // Google profile photos
+    "https://firebasestorage.googleapis.com", // Firebase storage
+    "https://www.gstatic.com", // Google static assets
+    "https://*.fal.media", // fal.ai generated images
+  ],
   'font-src': ["'self'", "data:"],
   'connect-src': [
     "'self'",
@@ -56,10 +68,27 @@ const nextConfig = {
   images: {
     // Enable image optimization for production
     unoptimized: process.env.NODE_ENV === 'development',
+    // SECURITY: Restrict remote patterns to trusted domains only
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: '**',
+        hostname: 'lh3.googleusercontent.com', // Google profile photos
+      },
+      {
+        protocol: 'https',
+        hostname: 'firebasestorage.googleapis.com', // Firebase storage
+      },
+      {
+        protocol: 'https',
+        hostname: '*.googleapis.com', // Google APIs
+      },
+      {
+        protocol: 'https',
+        hostname: 'www.gstatic.com', // Google static assets
+      },
+      {
+        protocol: 'https',
+        hostname: '*.fal.media', // fal.ai generated images
       },
     ],
   },
@@ -69,7 +98,7 @@ const nextConfig = {
     return [
       {
         source: '/api/:path*',
-        destination: 'http://localhost:8000/:path*',
+        destination: 'http://localhost:9002/:path*',
       },
     ]
   },

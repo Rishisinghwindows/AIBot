@@ -115,8 +115,8 @@ class TravelService:
                     data = response.json()
                     logger.debug(f"PNR API response for {pnr}: {data}")
 
-                    # Check for explicit error responses
-                    if data.get("error") or data.get("status") == "error":
+                    # Check for explicit error responses (API returns success: false)
+                    if data.get("error") or data.get("status") == "error" or data.get("success") == False:
                         return {
                             "success": False,
                             "error": data.get("message", f"PNR {pnr} not found or invalid")

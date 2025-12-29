@@ -135,8 +135,13 @@ SQL:"""
 
             with psycopg2.connect(**self._conn_kwargs()) as conn:
                 with conn.cursor() as cur:
-                    # Use validated and quoted schema name
-                    cur.execute(f"SET search_path TO {safe_schema};")
+                    # Use psycopg2.sql module for safe identifier quoting
+                    from psycopg2 import sql as psycopg2_sql
+                    cur.execute(
+                        psycopg2_sql.SQL("SET search_path TO {}").format(
+                            psycopg2_sql.Identifier(self.settings.postgres_schema)
+                        )
+                    )
                     cur.execute(sql)
                     rows = cur.fetchall()
                     col_names = [desc[0] for desc in cur.description] if cur.description else []

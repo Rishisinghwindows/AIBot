@@ -20,7 +20,7 @@ export function Header() {
         <div className="flex h-14 items-center justify-between rounded-2xl border bg-white/80 px-3 shadow-xl shadow-black/5 backdrop-blur">
           <Link href="/" className="flex items-center gap-2">
             <Image
-              src="/puch/logo.png"
+              src="/d23-logo.png"
               alt="D23 AI logo"
               width={36}
               height={36}
@@ -52,7 +52,7 @@ export function Header() {
               size="sm"
               className="gap-2 rounded-lg bg-primary text-primary-foreground shadow-md hover:bg-primary/90"
             >
-              <Link href="https://api.whatsapp.com/send/?phone=%2B919934438606&text=Hey+D23%21+What+can+you+do%3F&type=phone_number&app_absent=0" target="_blank" rel="noreferrer">
+              <Link href="https://wa.me/918548819349?text=Hey%20D23%20AI%21%20What%20can%20you%20do%3F" target="_blank" rel="noreferrer">
                 <span className="flex h-6 w-6 items-center justify-center rounded-md bg-white text-primary shadow">
                   <svg
                     height="1em"

@@ -23,7 +23,7 @@ export function Footer() {
       <div className="mx-auto max-w-6xl space-y-6 px-4 py-12">
         <div className="flex flex-col items-start gap-6 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-3">
-            <Image src="/puch/logo.png" alt="D23 AI" width={40} height={40} className="h-10 w-10" />
+            <Image src="/d23-logo.png" alt="D23 AI" width={40} height={40} className="h-10 w-10" />
             <div>
               <p className="text-lg font-semibold text-foreground">{footerData.logo}</p>
               <p className="text-sm text-foreground/60">WhatsApp-native AI for Bharat.</p>
@@ -33,7 +33,7 @@ export function Footer() {
             asChild
             className="gap-2 rounded-md bg-primary px-4 py-2 text-sm text-white shadow-md transition hover:-translate-y-0.5 hover:bg-primary/90"
           >
-            <Link href="https://api.whatsapp.com/send/?phone=%2B919934438606&text=Hey+D23%21+What+can+you+do%3F&type=phone_number&app_absent=0" target="_blank" rel="noreferrer">
+            <Link href="https://wa.me/918548819349?text=Hey%20D23%20AI%21%20What%20can%20you%20do%3F" target="_blank" rel="noreferrer">
               <svg height="1em" preserveAspectRatio="xMidYMid" viewBox="0 0 256 259" width="1em" xmlns="http://www.w3.org/2000/svg" className="h-4 w-4">
                 <path
                   d="m67.663 221.823 4.185 2.093c17.44 10.463 36.971 15.346 56.503 15.346 61.385 0 111.609-50.224 111.609-111.609 0-29.297-11.859-57.897-32.785-78.824-20.927-20.927-48.83-32.785-78.824-32.785-61.385 0-111.61 50.224-110.912 112.307 0 20.926 6.278 41.156 16.741 58.594l2.79 4.186-11.16 41.156 41.853-10.464Z"

@@ -24,6 +24,7 @@ from app.web import web_router
 from app.tasks.router import router as tasks_router, web_router as tasks_web_router
 from app.oauth import gmail_router, github_router, slack_router, jira_router, uber_router
 from app.personas.router import router as personas_router, public_router as personas_public_router
+from app.mcp.router import router as mcp_router
 from app.tasks.scheduler import start_scheduler, stop_scheduler
 from app.config import Settings, get_settings
 from app.db.base import Base, engine, SessionLocal
@@ -199,8 +200,23 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 # Get settings for CORS configuration
 _settings = get_settings()
 
-# CORS middleware - uses environment-based configuration
-# In production, set CORS_ORIGINS to specific allowed origins
+# Middleware order: Last added = First executed on requests
+# So we add in reverse order of desired execution
+
+# Security headers middleware (validates X-Request-ID, X-Nonce, X-Timestamp)
+app.add_middleware(SecurityHeadersMiddleware)
+
+# Rate limiting middleware
+app.add_middleware(RateLimitMiddleware)
+
+# Metrics middleware (captures request metrics)
+app.add_middleware(MetricsMiddleware)
+
+# Correlation ID middleware (sets up request context for logging)
+app.add_middleware(CorrelationIdMiddleware)
+
+# CORS middleware - MUST be added last so it's executed first
+# This ensures CORS preflight (OPTIONS) requests are handled before other middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_settings.cors_origins_list,
@@ -209,18 +225,6 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["X-Request-ID", "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset"],
 )
-
-# Correlation ID middleware (outermost - sets up request context for logging)
-app.add_middleware(CorrelationIdMiddleware)
-
-# Metrics middleware (captures request metrics)
-app.add_middleware(MetricsMiddleware)
-
-# Rate limiting middleware (must be before security middleware)
-app.add_middleware(RateLimitMiddleware)
-
-# Security headers middleware (validates X-Request-ID, X-Nonce, X-Timestamp)
-app.add_middleware(SecurityHeadersMiddleware)
 
 # Include routers
 app.include_router(auth_router)
@@ -240,6 +244,9 @@ app.include_router(uber_router)
 # Persona routers
 app.include_router(personas_router)
 app.include_router(personas_public_router)
+
+# MCP router
+app.include_router(mcp_router)
 
 
 def get_services(settings: Settings):
@@ -274,6 +281,15 @@ async def startup_event() -> None:
     # Start the task scheduler
     await start_scheduler()
 
+    # Start MCP health checks (background monitoring)
+    try:
+        from app.mcp.manager import MCPManager
+        mcp_manager = MCPManager.get_instance()
+        await mcp_manager.start_health_checks()
+        logger.info("mcp_health_checks_started")
+    except Exception as e:
+        logger.warning("mcp_health_checks_failed", error=str(e))
+
     logger.info("app_startup", version="2.1.0")
 
 
@@ -281,6 +297,16 @@ async def startup_event() -> None:
 async def shutdown_event() -> None:
     """Shutdown handler - stop background services."""
     await stop_scheduler()
+
+    # Stop MCP health checks
+    try:
+        from app.mcp.manager import MCPManager
+        mcp_manager = MCPManager.get_instance()
+        await mcp_manager.stop_health_checks()
+        logger.info("mcp_health_checks_stopped")
+    except Exception as e:
+        logger.warning("mcp_health_checks_stop_failed", error=str(e))
+
     logger.info("app_shutdown")
 
 

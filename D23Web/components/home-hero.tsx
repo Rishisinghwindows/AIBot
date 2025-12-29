@@ -30,10 +30,7 @@ export function HomeHero({
           className="inline-flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-6 py-3 rounded-full font-medium transition-colors"
         > */}
         <Link
-          href={`https://api.whatsapp.com/send/?phone=${phoneNumber.replace(
-            /\s/g,
-            ""
-          )}&text=Hey+D23+AI%21+What+can+you+do%3F&type=phone_number&app_absent=0`}
+          href="https://wa.me/918548819349?text=Hey%20D23%20AI%21%20What%20can%20you%20do%3F"
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-6 py-3 rounded-full font-medium transition-colors"

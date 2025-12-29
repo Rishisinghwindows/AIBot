@@ -151,6 +151,59 @@ async def handle_webhook(
         return {"status": "error", "message": str(e)}
 
 
+async def transcribe_audio(client: "WhatsAppClient", media_id: str) -> Optional[str]:
+    """
+    Download and transcribe WhatsApp audio message.
+
+    Args:
+        client: WhatsApp client instance
+        media_id: WhatsApp media ID
+
+    Returns:
+        Transcribed text or None if failed
+    """
+    try:
+        from app.config import get_settings
+        import openai
+        import io
+
+        settings = get_settings()
+
+        if not settings.openai_api_key:
+            logger.warning("OpenAI API key not configured for transcription")
+            return None
+
+        # Get media URL from WhatsApp
+        media_url = await client.get_media_url(media_id)
+        if not media_url:
+            logger.error("Failed to get media URL for transcription")
+            return None
+
+        # Download the audio
+        audio_bytes = await client.download_media(media_url)
+        if not audio_bytes:
+            logger.error("Failed to download audio for transcription")
+            return None
+
+        # Transcribe using OpenAI Whisper
+        openai_client = openai.OpenAI(api_key=settings.openai_api_key)
+        audio_file = io.BytesIO(audio_bytes)
+        audio_file.name = "voice_message.ogg"
+
+        transcription = openai_client.audio.transcriptions.create(
+            model="whisper-1",
+            file=audio_file,
+        )
+
+        transcribed_text = transcription.text.strip()
+        logger.info(f"Audio transcribed: {transcribed_text[:100]}...")
+        return transcribed_text
+
+    except Exception as e:
+        logger.error(f"Audio transcription failed: {e}", exc_info=True)
+        return None
+
+
 async def process_and_respond(message: dict):
     """
     Background task to process message and send response.
@@ -160,9 +213,22 @@ async def process_and_respond(message: dict):
     """
     client = get_whatsapp_client()
 
+    # Check if input was a voice message
+    is_voice_input = message.get("message_type") == "audio"
+
     try:
         # Mark message as read
         await client.mark_as_read(message["message_id"])
+
+        # If voice message, transcribe it first
+        if is_voice_input and message.get("media_id"):
+            transcribed_text = await transcribe_audio(client, message["media_id"])
+            if transcribed_text:
+                message["text"] = transcribed_text
+                logger.info(f"Voice message transcribed: {transcribed_text[:50]}...")
+            else:
+                # Fallback message if transcription fails
+                message["text"] = "Voice message received but could not be transcribed"
 
         # Send typing indicator (react with hourglass)
         try:
@@ -187,24 +253,74 @@ async def process_and_respond(message: dict):
         except Exception as e:
             logger.warning(f"Failed to remove typing reaction: {e}")
 
+        response_text = result.get("response_text", "")
+        response_type = result.get("response_type", "text")
+
+        # If input was voice and we have a text response, convert to voice
+        if is_voice_input and response_text and response_type == "text":
+            try:
+                from app.services.tts_service import get_tts_service
+                from app.i18n import detect_language
+
+                tts_service = get_tts_service()
+
+                # Detect language of response for appropriate voice
+                detected_lang = detect_language(response_text)
+
+                # Generate audio URL
+                audio_url = await tts_service.text_to_speech_url(
+                    text=response_text,
+                    language=detected_lang,
+                )
+
+                if audio_url:
+                    # Send voice response
+                    await client.send_audio_message(
+                        to=message["from_number"],
+                        audio_url=audio_url,
+                        reply_to=message["message_id"],
+                    )
+                    # Also send text as follow-up for reference
+                    await client.send_text_message(
+                        to=message["from_number"],
+                        text=f"📝 {response_text}",
+                    )
+                    logger.info(
+                        f"Voice response sent to {message['from_number']}, "
+                        f"intent: {result.get('intent')}, language: {detected_lang}"
+                    )
+                    return
+
+            except ImportError as e:
+                logger.warning(f"TTS service not available: {e}")
+            except Exception as e:
+                logger.error(f"TTS generation failed: {e}", exc_info=True)
+                # Fall through to text response
+
         # Send response based on type
-        if result.get("response_type") == "text" and result.get("response_text"):
+        if response_type == "text" and response_text:
             await client.send_text_message(
                 to=message["from_number"],
-                text=result["response_text"],
+                text=response_text,
                 reply_to=message["message_id"],
             )
-        elif result.get("response_type") == "image" and result.get("response_media_url"):
+        elif response_type == "image" and result.get("response_media_url"):
             await client.send_image_message(
                 to=message["from_number"],
                 image_url=result["response_media_url"],
-                caption=result.get("response_text"),
+                caption=response_text,
                 reply_to=message["message_id"],
             )
-        elif result.get("response_type") == "interactive" and result.get("buttons"):
+        elif response_type == "audio" and result.get("response_media_url"):
+            await client.send_audio_message(
+                to=message["from_number"],
+                audio_url=result["response_media_url"],
+                reply_to=message["message_id"],
+            )
+        elif response_type == "interactive" and result.get("buttons"):
             await client.send_interactive_buttons(
                 to=message["from_number"],
-                body_text=result["response_text"],
+                body_text=response_text,
                 buttons=result["buttons"],
                 reply_to=message["message_id"],
             )

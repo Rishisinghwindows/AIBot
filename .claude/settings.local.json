@@ -13,7 +13,28 @@
       "Bash(./venv/bin/pip:*)",
       "Bash(kill:*)",
       "Bash(/opt/homebrew/Cellar/python@3.12/3.12.12/bin/python3.12:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(pkill:*)",
+      "Bash(psql:*)",
+      "Bash(ln:*)",
+      "Bash(alembic upgrade:*)",
+      "Bash(pgrep:*)",
+      "Bash(SESSION_ID=\"hxTzQbYcQP01GEA9ViD_UEt2fCeYKR102o70GXyenXY\":*)",
+      "WebSearch",
+      "Bash(python3:*)",
+      "Bash(grep:*)",
+      "Bash(xargs kill -9)",
+      "Bash(pip3 install:*)",
+      "Bash(pip install:*)",
+      "Bash(./venv/bin/uvicorn:*)",
+      "Bash(/opt/homebrew/bin/python3.12:*)",
+      "Bash(brew services:*)",
+      "Bash(PGPASSWORD=postgres psql:*)",
+      "Bash(brew --prefix:*)",
+      "Bash(pg_config:*)",
+      "Bash(PGPASSWORD=password psql:*)",
+      "Bash(./venv/bin/alembic upgrade:*)",
+      "Bash(cp:*)"
     ]
   }
 }

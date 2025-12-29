@@ -46,7 +46,7 @@ function Header() {
           </nav>
 
           <Link
-            href="https://api.whatsapp.com/send/?phone=%2B919934438606&text=Hey+D23%21+What+can+you+do%3F&type=phone_number&app_absent=0"
+            href="https://wa.me/918548819349?text=Hey%20D23%20AI%21%20What%20can%20you%20do%3F"
             target="_blank"
             className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white text-sm font-medium"
           >
@@ -71,8 +71,8 @@ const contactInfo = [
   {
     icon: MessageCircle,
     label: "WhatsApp",
-    value: "+91 99344 38606",
-    href: "https://api.whatsapp.com/send/?phone=%2B919934438606&text=Hey+D23%21+What+can+you+do%3F&type=phone_number&app_absent=0",
+    value: "+91 85488 19349",
+    href: "https://wa.me/918548819349?text=Hey%20D23%20AI%21%20What%20can%20you%20do%3F",
     color: "from-green-500 to-emerald-500"
   },
   {
@@ -213,7 +213,7 @@ export default function ContactPage() {
                   Chat with D23 AI directly on WhatsApp for instant responses.
                 </p>
                 <Link
-                  href="https://api.whatsapp.com/send/?phone=%2B919934438606&text=Hey+D23%21+What+can+you+do%3F&type=phone_number&app_absent=0"
+                  href="https://wa.me/918548819349?text=Hey%20D23%20AI%21%20What%20can%20you%20do%3F"
                   target="_blank"
                   className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white text-sm font-medium"
                 >

@@ -38,6 +38,8 @@ pnpm-debug.log*
 .env
 .env.*
 .envrc
+firebase-credentials.json
+*-credentials.json
 
 ##################################
 # Python / FastAPI

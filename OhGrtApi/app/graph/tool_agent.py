@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from typing import Any, Dict, List, Optional
+from uuid import UUID
 
 from langchain_core.messages import HumanMessage
 from langchain_core.tools import tool
@@ -23,16 +24,26 @@ from app.services.astrology_service import get_astrology_service
 from app.services.travel_service import get_travel_service
 from app.services.news_service import get_news_service
 from app.services.schedule_parser import parse_schedule, extract_task_from_message
+from app.graph.nodes.image_node import generate_image_fal, _clean_prompt
 from app.utils.llm import build_chat_llm
 from app.utils.models import RouterCategory
+from app.logger import logger
 
 
 class ToolAgent:
     """Wrapper around LangGraph agent providing tool listing and per-request selection."""
 
-    def __init__(self, settings, credentials: Dict[str, Any] | None = None):
+    def __init__(
+        self,
+        settings,
+        credentials: Dict[str, Any] | None = None,
+        db=None,
+        user_id: Optional[UUID] = None,
+    ):
         self.settings = settings
         self.credentials = credentials or {}
+        self.db = db
+        self.user_id = user_id
         self.llm = build_chat_llm(settings)
         self.weather_service = WeatherService(settings)
         self.rag_service = RAGService(settings)
@@ -94,7 +105,7 @@ class ToolAgent:
 
     def _build_tools(self):
         """Construct tool set and state for a single invocation."""
-        last_tool: Dict[str, str] = {"name": RouterCategory.chat.value}
+        last_tool: Dict[str, Any] = {"name": RouterCategory.chat.value, "structured_data": None}
         llm = self.llm
 
         @tool("weather", return_direct=True)
@@ -102,6 +113,14 @@ class ToolAgent:
             """Get live weather for a city using OpenWeather."""
             last_tool["name"] = RouterCategory.weather.value
             weather = await self.weather_service.get_weather(city)
+            # Store structured data for card rendering
+            last_tool["structured_data"] = {
+                "city": weather.city,
+                "temperature": weather.temperature_c,
+                "humidity": weather.humidity,
+                "condition": weather.condition,
+                "raw": weather.raw if hasattr(weather, 'raw') else {},
+            }
             return (
                 f"Weather for {weather.city}: {weather.temperature_c}°C, "
                 f"humidity {weather.humidity}%, condition {weather.condition}."
@@ -221,6 +240,54 @@ class ToolAgent:
             last_tool["name"] = "github"
             return await self.github_service.create_issue(title, body)
 
+        @tool("github_commits", return_direct=True)
+        async def github_commits_tool(limit: int = 10, branch: str = "") -> str:
+            """List recent commits in the GitHub repo. Optional: limit (default 10), branch name."""
+            last_tool["name"] = "github"
+            return await self.github_service.list_commits(limit=limit, branch=branch)
+
+        @tool("github_commit_detail", return_direct=True)
+        async def github_commit_detail_tool(sha: str) -> str:
+            """Get details of a specific commit by SHA hash."""
+            last_tool["name"] = "github"
+            return await self.github_service.get_commit(sha)
+
+        @tool("github_prs", return_direct=True)
+        async def github_prs_tool(state: str = "open", limit: int = 10) -> str:
+            """List pull requests. State can be: open, closed, all. Default: open."""
+            last_tool["name"] = "github"
+            return await self.github_service.list_pull_requests(state=state, limit=limit)
+
+        @tool("github_pr_detail", return_direct=True)
+        async def github_pr_detail_tool(pr_number: int) -> str:
+            """Get details of a specific pull request by number."""
+            last_tool["name"] = "github"
+            return await self.github_service.get_pull_request(pr_number)
+
+        @tool("github_repo_info", return_direct=True)
+        async def github_repo_info_tool() -> str:
+            """Get repository information (stars, forks, description, etc.)."""
+            last_tool["name"] = "github"
+            return await self.github_service.get_repo_info()
+
+        @tool("github_branches", return_direct=True)
+        async def github_branches_tool(limit: int = 10) -> str:
+            """List branches in the repository."""
+            last_tool["name"] = "github"
+            return await self.github_service.list_branches(limit=limit)
+
+        @tool("github_contributors", return_direct=True)
+        async def github_contributors_tool(limit: int = 10) -> str:
+            """List top contributors to the repository."""
+            last_tool["name"] = "github"
+            return await self.github_service.list_contributors(limit=limit)
+
+        @tool("github_file", return_direct=True)
+        async def github_file_tool(path: str, branch: str = "") -> str:
+            """Read a file from the repository. Provide file path (e.g., 'README.md')."""
+            last_tool["name"] = "github"
+            return await self.github_service.get_file_content(path=path, branch=branch)
+
         @tool("confluence_search", return_direct=True)
         async def confluence_search_tool(query: str) -> str:
             """Search Confluence pages by CQL query."""
@@ -248,6 +315,19 @@ class ToolAgent:
             result = await self.astrology_service.get_horoscope(sign, period)
             if result["success"]:
                 data = result["data"]
+                # Store structured data for card rendering
+                last_tool["structured_data"] = {
+                    "sign": data.get("sign"),
+                    "zodiac_sign": data.get("sign"),
+                    "period": data.get("period"),
+                    "horoscope": data.get("horoscope"),
+                    "daily_horoscope": data.get("horoscope"),
+                    "lucky_number": data.get("lucky_number"),
+                    "lucky_color": data.get("lucky_color"),
+                    "advice": data.get("advice"),
+                    "mood": data.get("mood"),
+                    "compatibility": data.get("compatibility"),
+                }
                 return (
                     f"*{data['sign']} {data['period'].title()} Horoscope*\n\n"
                     f"{data['horoscope']}\n\n"
@@ -358,6 +438,19 @@ class ToolAgent:
             result = await self.astrology_service.calculate_numerology(name, birth_date or None)
             if result["success"]:
                 data = result["data"]
+                # Store structured data for card rendering
+                last_tool["structured_data"] = {
+                    "name": data.get("name"),
+                    "name_number": data.get("name_number"),
+                    "name_meaning": data.get("name_meaning"),
+                    "birth_date": data.get("birth_date"),
+                    "life_path_number": data.get("life_path_number"),
+                    "life_path_meaning": data.get("life_path_meaning"),
+                    "lucky_numbers": data.get("lucky_numbers", []),
+                    "expression_number": data.get("expression_number"),
+                    "soul_urge_number": data.get("soul_urge_number"),
+                    "personality_number": data.get("personality_number"),
+                }
                 response = f"*Numerology for {data['name']}*\n\n"
                 response += f"Name Number: {data['name_number']}\n"
                 meaning = data.get('name_meaning', {})
@@ -378,6 +471,13 @@ class ToolAgent:
             result = await self.astrology_service.draw_tarot(question or None, spread_type)
             if result["success"]:
                 data = result["data"]
+                # Store structured data for card rendering
+                last_tool["structured_data"] = {
+                    "spread_type": data.get("spread_type"),
+                    "question": data.get("question"),
+                    "cards": data.get("cards", []),
+                    "interpretation": data.get("interpretation"),
+                }
                 response = f"*Tarot Reading ({data['spread_type'].replace('_', ' ').title()})*\n\n"
                 if data.get('question'):
                     response += f"Question: {data['question']}\n\n"
@@ -408,6 +508,18 @@ class ToolAgent:
             result = await self.travel_service.get_pnr_status(pnr)
             if result["success"]:
                 data = result["data"]
+                # Store structured data for card rendering
+                last_tool["structured_data"] = {
+                    "pnr": data.get("pnr"),
+                    "train_number": data.get("train_number"),
+                    "train_name": data.get("train_name"),
+                    "from_station": data.get("from_station"),
+                    "to_station": data.get("to_station"),
+                    "journey_date": data.get("journey_date"),
+                    "class": data.get("class"),
+                    "chart_prepared": data.get("chart_prepared"),
+                    "passengers": data.get("passengers", []),
+                }
                 response = f"*PNR Status: {data['pnr']}*\n\n"
                 response += f"Train: {data['train_name']} ({data['train_number']})\n"
                 response += f"From: {data['from_station']}\n"
@@ -467,6 +579,13 @@ class ToolAgent:
             result = await self.news_service.get_news(query or None, category or None, limit=5)
             if result["success"]:
                 data = result["data"]
+                # Store structured data for card rendering
+                last_tool["structured_data"] = {
+                    "articles": data.get("articles", []),
+                    "items": data.get("articles", []),
+                    "query": data.get("query"),
+                    "category": data.get("category"),
+                }
                 response = "*Latest News*\n"
                 if data.get('query'):
                     response += f"(Search: {data['query']})\n"
@@ -480,6 +599,27 @@ class ToolAgent:
                     response += f"   Source: {article['source']}\n\n"
                 return response
             return f"Could not get news: {result.get('error', 'Unknown error')}"
+
+        # ==================== IMAGE GENERATION TOOL ====================
+
+        @tool("image_gen", return_direct=True)
+        async def image_gen_tool(prompt: str) -> str:
+            """Generate an AI image from a text description. Describe what you want to see."""
+            last_tool["name"] = "image_gen"
+            clean_prompt = _clean_prompt(prompt)
+            result = await generate_image_fal(clean_prompt)
+            if result.get("success"):
+                image_url = result.get("data", {}).get("image_url")
+                if image_url:
+                    last_tool["media_url"] = image_url
+                    last_tool["structured_data"] = {
+                        "prompt": clean_prompt,
+                        "image_url": image_url,
+                    }
+                    # Return just the prompt description - image displays via media_url
+                    return f"Here's the generated image for: {clean_prompt}"
+            error = result.get("error", "Unknown error")
+            return f"Could not generate image: {error}"
 
         # ==================== UBER TOOLS ====================
 
@@ -590,10 +730,9 @@ class ToolAgent:
         # ==================== SCHEDULING TOOL ====================
 
         @tool("schedule_task", return_direct=True)
-        async def schedule_task_tool(message: str, session_id: str = "", user_id: str = "") -> str:
+        async def schedule_task_tool(message: str) -> str:
             """Schedule a reminder, alert, or recurring task from natural language.
-            Examples: 'remind me to check portfolio at 12 pm', 'schedule alert every day at 9am'.
-            Requires either session_id (for anonymous) or user_id (for authenticated users)."""
+            Examples: 'remind me to check portfolio at 12 pm', 'schedule alert every day at 9am'."""
             last_tool["name"] = "schedule_task"
 
             # Parse the schedule from natural language
@@ -604,27 +743,16 @@ class ToolAgent:
             try:
                 from app.db.base import SessionLocal
                 from app.tasks.service import ScheduledTaskService
-                from uuid import UUID
 
                 db = SessionLocal()
                 try:
                     service = ScheduledTaskService(db)
 
-                    # Determine ownership
-                    task_user_id = None
-                    task_session_id = None
+                    # Use user_id from the ToolAgent instance (captured via closure)
+                    task_user_id = self.user_id
 
-                    if user_id:
-                        try:
-                            task_user_id = UUID(user_id)
-                        except ValueError:
-                            pass
-
-                    if not task_user_id and session_id:
-                        task_session_id = session_id
-
-                    if not task_user_id and not task_session_id:
-                        return "I need your session to create a scheduled task. Please try again."
+                    if not task_user_id:
+                        return "Please sign in to create scheduled tasks. Anonymous scheduling is not supported."
 
                     # Create the task
                     task = service.create_task(
@@ -633,7 +761,6 @@ class ToolAgent:
                         task_type="scheduled_query" if agent_prompt else "reminder",
                         schedule_type=parsed.schedule_type,
                         user_id=task_user_id,
-                        session_id=task_session_id,
                         scheduled_at=parsed.scheduled_at,
                         cron_expression=parsed.cron_expression,
                         task_timezone="Asia/Kolkata",  # Default to IST for Indian users
@@ -664,6 +791,236 @@ class ToolAgent:
             except Exception as e:
                 return f"I understood you want to schedule: '{title}' ({parsed.description}), but couldn't create it: {str(e)}"
 
+        @tool("list_tasks", return_direct=True)
+        async def list_tasks_tool(status: str = "active") -> str:
+            """List your scheduled tasks and reminders. Status can be: active, paused, completed, all."""
+            last_tool["name"] = "list_tasks"
+
+            try:
+                from app.db.base import SessionLocal
+                from app.tasks.service import ScheduledTaskService
+
+                db = SessionLocal()
+                try:
+                    service = ScheduledTaskService(db)
+
+                    # Get tasks for current user
+                    status_filter = None if status == "all" else status
+                    tasks, total, _ = service.get_tasks(
+                        user_id=self.user_id,
+                        status=status_filter,
+                        limit=10,
+                    )
+
+                    if not tasks:
+                        return f"You don't have any {status} scheduled tasks."
+
+                    response = f"📋 *Your Scheduled Tasks* ({total} total)\n\n"
+                    for i, task in enumerate(tasks, 1):
+                        status_emoji = {"active": "🟢", "paused": "⏸️", "completed": "✅", "cancelled": "❌"}.get(task.status, "⚪")
+                        response += f"{i}. {status_emoji} *{task.title}*\n"
+                        response += f"   Type: {task.schedule_type} | Status: {task.status}\n"
+                        if task.next_run_at:
+                            next_run = task.next_run_at.strftime("%d %b %Y at %I:%M %p")
+                            response += f"   Next run: {next_run}\n"
+                        if task.description:
+                            response += f"   Note: {task.description[:50]}...\n" if len(task.description) > 50 else f"   Note: {task.description}\n"
+                        response += f"   ID: `{str(task.id)[:8]}`\n\n"
+
+                    return response
+
+                finally:
+                    db.close()
+
+            except Exception as e:
+                logger.error("list_tasks_error", error=str(e))
+                return f"Could not list tasks: {str(e)}"
+
+        @tool("delete_task", return_direct=True)
+        async def delete_task_tool(task_id: str) -> str:
+            """Delete a scheduled task by its ID. Use list_tasks to find the task ID."""
+            last_tool["name"] = "delete_task"
+
+            try:
+                from app.db.base import SessionLocal
+                from app.tasks.service import ScheduledTaskService
+                from uuid import UUID
+
+                db = SessionLocal()
+                try:
+                    service = ScheduledTaskService(db)
+
+                    # Try to parse UUID (support both full and short IDs)
+                    try:
+                        # First try full UUID
+                        parsed_id = UUID(task_id)
+                    except ValueError:
+                        # Try to find task by partial ID
+                        tasks, _, _ = service.get_tasks(user_id=self.user_id, limit=100)
+                        matching = [t for t in tasks if str(t.id).startswith(task_id)]
+                        if len(matching) == 1:
+                            parsed_id = matching[0].id
+                        elif len(matching) > 1:
+                            return f"Multiple tasks match '{task_id}'. Please provide a more specific ID."
+                        else:
+                            return f"No task found with ID '{task_id}'. Use list_tasks to see your tasks."
+
+                    # Get task title before deleting
+                    task = service.get_task(parsed_id, user_id=self.user_id)
+                    if not task:
+                        return f"Task not found or you don't have permission to delete it."
+
+                    task_title = task.title
+
+                    # Delete the task
+                    deleted = service.delete_task(parsed_id, user_id=self.user_id)
+
+                    if deleted:
+                        return f"✅ Deleted task: *{task_title}*"
+                    else:
+                        return f"Could not delete task. Make sure you have permission."
+
+                finally:
+                    db.close()
+
+            except Exception as e:
+                logger.error("delete_task_error", error=str(e))
+                return f"Could not delete task: {str(e)}"
+
+        @tool("pause_task", return_direct=True)
+        async def pause_task_tool(task_id: str) -> str:
+            """Pause a recurring scheduled task. The task won't run until resumed."""
+            last_tool["name"] = "pause_task"
+
+            try:
+                from app.db.base import SessionLocal
+                from app.tasks.service import ScheduledTaskService
+                from uuid import UUID
+
+                db = SessionLocal()
+                try:
+                    service = ScheduledTaskService(db)
+
+                    # Parse task ID
+                    try:
+                        parsed_id = UUID(task_id)
+                    except ValueError:
+                        tasks, _, _ = service.get_tasks(user_id=self.user_id, limit=100)
+                        matching = [t for t in tasks if str(t.id).startswith(task_id)]
+                        if len(matching) == 1:
+                            parsed_id = matching[0].id
+                        elif len(matching) > 1:
+                            return f"Multiple tasks match '{task_id}'. Please provide a more specific ID."
+                        else:
+                            return f"No task found with ID '{task_id}'."
+
+                    task = service.pause_task(parsed_id, user_id=self.user_id)
+
+                    if task:
+                        return f"⏸️ Paused task: *{task.title}*\n\nUse 'resume task {task_id}' to resume it."
+                    else:
+                        return f"Could not pause task. It may already be paused or doesn't exist."
+
+                finally:
+                    db.close()
+
+            except Exception as e:
+                logger.error("pause_task_error", error=str(e))
+                return f"Could not pause task: {str(e)}"
+
+        @tool("resume_task", return_direct=True)
+        async def resume_task_tool(task_id: str) -> str:
+            """Resume a paused scheduled task."""
+            last_tool["name"] = "resume_task"
+
+            try:
+                from app.db.base import SessionLocal
+                from app.tasks.service import ScheduledTaskService
+                from uuid import UUID
+
+                db = SessionLocal()
+                try:
+                    service = ScheduledTaskService(db)
+
+                    # Parse task ID
+                    try:
+                        parsed_id = UUID(task_id)
+                    except ValueError:
+                        tasks, _, _ = service.get_tasks(user_id=self.user_id, status="paused", limit=100)
+                        matching = [t for t in tasks if str(t.id).startswith(task_id)]
+                        if len(matching) == 1:
+                            parsed_id = matching[0].id
+                        elif len(matching) > 1:
+                            return f"Multiple tasks match '{task_id}'. Please provide a more specific ID."
+                        else:
+                            return f"No paused task found with ID '{task_id}'."
+
+                    task = service.resume_task(parsed_id, user_id=self.user_id)
+
+                    if task:
+                        next_run = task.next_run_at.strftime("%d %b %Y at %I:%M %p") if task.next_run_at else "soon"
+                        return f"▶️ Resumed task: *{task.title}*\n\nNext run: {next_run}"
+                    else:
+                        return f"Could not resume task. It may not be paused or doesn't exist."
+
+                finally:
+                    db.close()
+
+            except Exception as e:
+                logger.error("resume_task_error", error=str(e))
+                return f"Could not resume task: {str(e)}"
+
+        @tool("update_task", return_direct=True)
+        async def update_task_tool(task_id: str, title: str = "", description: str = "") -> str:
+            """Update a scheduled task's title or description."""
+            last_tool["name"] = "update_task"
+
+            if not title and not description:
+                return "Please provide a new title or description to update."
+
+            try:
+                from app.db.base import SessionLocal
+                from app.tasks.service import ScheduledTaskService
+                from uuid import UUID
+
+                db = SessionLocal()
+                try:
+                    service = ScheduledTaskService(db)
+
+                    # Parse task ID
+                    try:
+                        parsed_id = UUID(task_id)
+                    except ValueError:
+                        tasks, _, _ = service.get_tasks(user_id=self.user_id, limit=100)
+                        matching = [t for t in tasks if str(t.id).startswith(task_id)]
+                        if len(matching) == 1:
+                            parsed_id = matching[0].id
+                        elif len(matching) > 1:
+                            return f"Multiple tasks match '{task_id}'. Please provide a more specific ID."
+                        else:
+                            return f"No task found with ID '{task_id}'."
+
+                    # Build update kwargs
+                    updates = {}
+                    if title:
+                        updates["title"] = title
+                    if description:
+                        updates["description"] = description
+
+                    task = service.update_task(parsed_id, user_id=self.user_id, **updates)
+
+                    if task:
+                        return f"✏️ Updated task: *{task.title}*"
+                    else:
+                        return f"Could not update task. Make sure it exists and you have permission."
+
+                finally:
+                    db.close()
+
+            except Exception as e:
+                logger.error("update_task_error", error=str(e))
+                return f"Could not update task: {str(e)}"
+
         tools = [
             weather_tool,
             pdf_tool,
@@ -677,6 +1034,14 @@ class ToolAgent:
             slack_post_tool,
             github_search_tool,
             github_create_tool,
+            github_commits_tool,
+            github_commit_detail_tool,
+            github_prs_tool,
+            github_pr_detail_tool,
+            github_repo_info_tool,
+            github_branches_tool,
+            github_contributors_tool,
+            github_file_tool,
             confluence_search_tool,
             custom_mcp_tool,
             web_crawl_tool,
@@ -696,14 +1061,21 @@ class ToolAgent:
             metro_info_tool,
             # D23Bot News tool
             news_tool,
+            # Image generation tool
+            image_gen_tool,
             # Uber tools
             uber_profile_tool,
             uber_history_tool,
             uber_price_tool,
             uber_eta_tool,
             uber_products_tool,
-            # Scheduling tool
+            # Scheduling tools
             schedule_task_tool,
+            list_tasks_tool,
+            delete_task_tool,
+            pause_task_tool,
+            resume_task_tool,
+            update_task_tool,
             # General chat
             chat_tool,
         ]
@@ -723,12 +1095,26 @@ class ToolAgent:
             "gmail": self.gmail_service.available,
             "github_search": self.github_service.available,
             "github_create": self.github_service.available,
+            "github_commits": self.github_service.available,
+            "github_commit_detail": self.github_service.available,
+            "github_prs": self.github_service.available,
+            "github_pr_detail": self.github_service.available,
+            "github_repo_info": self.github_service.available,
+            "github_branches": self.github_service.available,
+            "github_contributors": self.github_service.available,
+            "github_file": self.github_service.available,
             "google_drive_list": self.drive_service.available,
             "uber_profile": self.uber_service.available,
             "uber_history": self.uber_service.available,
             "uber_price": self.uber_service.available,
             "uber_eta": self.uber_service.available,
             "uber_products": self.uber_service.available,
+            # Task tools require user_id
+            "list_tasks": self.user_id is not None,
+            "delete_task": self.user_id is not None,
+            "pause_task": self.user_id is not None,
+            "resume_task": self.user_id is not None,
+            "update_task": self.user_id is not None,
         }
 
         def is_available(name: str) -> bool:
@@ -743,12 +1129,42 @@ class ToolAgent:
             if is_available(tool.name)
         ]
 
+    async def _get_mcp_tools(self) -> List[Any]:
+        """
+        Dynamically discover and load MCP tools from user's configured servers.
+
+        Returns:
+            List of LangChain tools from MCP servers
+        """
+        if not self.db or not self.user_id:
+            return []
+
+        try:
+            from app.mcp.langchain_bridge import get_mcp_tools_for_user
+            mcp_tools = await get_mcp_tools_for_user(self.db, self.user_id)
+            logger.info("mcp_tools_loaded", count=len(mcp_tools), user_id=str(self.user_id))
+            return mcp_tools
+        except Exception as e:
+            logger.warning("mcp_tools_load_failed", error=str(e))
+            return []
+
     async def invoke(self, message: str, allowed_tools: List[str] | None = None) -> Dict[str, Any]:
         """
         Run the agent with an optional subset of tools.
+
+        Dynamically loads MCP tools from user's configured servers and
+        combines them with built-in tools.
         """
         tools, last_tool = self._build_tools()
         tool_map = {t.name: t for t in tools}
+
+        # Dynamically load MCP tools from user's configured servers
+        mcp_tools = await self._get_mcp_tools()
+        if mcp_tools:
+            tools.extend(mcp_tools)
+            for t in mcp_tools:
+                tool_map[t.name] = t
+            logger.info("mcp_tools_added_to_agent", count=len(mcp_tools))
 
         if allowed_tools:
             active_tools = [t for t in tools if t.name in allowed_tools]
@@ -769,6 +1185,8 @@ class ToolAgent:
                     "response": result,
                     "category": RouterCategory.pdf.value,
                     "route_log": [RouterCategory.pdf.value],
+                    "intent": RouterCategory.pdf.value,
+                    "structured_data": None,
                 }
 
         result = await agent.ainvoke({"messages": [HumanMessage(content=message)]})
@@ -782,9 +1200,17 @@ class ToolAgent:
             "response": content or "No response",
             "category": last_tool["name"],
             "route_log": [last_tool["name"]],
+            "intent": last_tool["name"],
+            "structured_data": last_tool.get("structured_data"),
+            "media_url": last_tool.get("media_url"),
         }
 
 
-def build_tool_agent(settings, credentials: Dict[str, Any] | None = None):
+def build_tool_agent(
+    settings,
+    credentials: Dict[str, Any] | None = None,
+    db=None,
+    user_id: Optional[UUID] = None,
+):
     """Factory for ToolAgent to keep existing imports simple."""
-    return ToolAgent(settings, credentials=credentials)
+    return ToolAgent(settings, credentials=credentials, db=db, user_id=user_id)

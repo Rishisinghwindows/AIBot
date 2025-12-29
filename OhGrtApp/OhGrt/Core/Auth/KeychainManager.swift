@@ -119,11 +119,14 @@ actor KeychainManager {
         SecItemDelete(deleteQuery as CFDictionary)
 
         // Add new item
+        // SECURITY: Use kSecAttrAccessibleWhenUnlockedThisDeviceOnly for better security
+        // This ensures tokens are only accessible when the device is unlocked,
+        // preventing background process access to sensitive auth tokens
         let addQuery: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrAccount as String: key,
             kSecValueData as String: data,
-            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly
         ]
 
         let status = SecItemAdd(addQuery as CFDictionary, nil)

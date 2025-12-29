@@ -7,6 +7,7 @@ from langchain_core.prompts import ChatPromptTemplate
 
 from app.config import Settings
 from app.graph.gmail_agent import GmailAgent
+from app.graph.nodes.image_node import handle_image_generation
 from app.graph.pdf_rag_agent import PDFRagAgent
 from app.graph.postgres_agent import PostgresAgent
 from app.graph.router import RouterAgent
@@ -63,6 +64,19 @@ class GraphBuilder:
         result = await self.gmail_agent.run(state["message"])
         return {"response": result}
 
+    async def image_node(self, state: AgentState) -> Dict[str, Any]:
+        # Convert AgentState to BotState format for image handler
+        bot_state = {
+            "current_query": state["message"],
+            "extracted_entities": {"image_prompt": state["message"]},
+        }
+        result = await handle_image_generation(bot_state)
+        response = result.get("response_text", "Image generation failed.")
+        media_url = result.get("response_media_url")
+        if media_url:
+            return {"response": response, "metadata": {"media_url": media_url}}
+        return {"response": response}
+
     async def chat_node(self, state: AgentState) -> Dict[str, Any]:
         return {"response": await self._make_chat_response(state["message"])}
 
@@ -77,6 +91,7 @@ class GraphBuilder:
         graph.add_node("pdf", self.pdf_node)
         graph.add_node("sql", self.sql_node)
         graph.add_node("gmail", self.gmail_node)
+        graph.add_node("image", self.image_node)
         graph.add_node("chat", self.chat_node)
 
         graph.add_edge(START, "router")
@@ -88,6 +103,7 @@ class GraphBuilder:
                 RouterCategory.pdf.value: "pdf",
                 RouterCategory.sql.value: "sql",
                 RouterCategory.gmail.value: "gmail",
+                RouterCategory.image.value: "image",
                 RouterCategory.chat.value: "chat",
             },
         )
@@ -95,6 +111,7 @@ class GraphBuilder:
         graph.add_edge("pdf", END)
         graph.add_edge("sql", END)
         graph.add_edge("gmail", END)
+        graph.add_edge("image", END)
         graph.add_edge("chat", END)
 
         logger.info(f"langgraph_initialized: nodes={list(graph.nodes.keys())}")
