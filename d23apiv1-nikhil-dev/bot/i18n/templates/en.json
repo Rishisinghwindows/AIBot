@@ -1,0 +1,158 @@
+{
+  "common": {
+    "welcome": "Welcome! I'm your astrology assistant. How can I help you today?",
+    "error": "Sorry, something went wrong. Please try again.",
+    "not_understood": "I didn't understand that. Could you please rephrase?",
+    "thank_you": "Thank you! Is there anything else I can help with?",
+    "goodbye": "Goodbye! May the stars guide you!",
+    "please_wait": "Please wait while I process your request...",
+    "help": "I can help you with:\n- Daily horoscope\n- Birth chart (Kundli)\n- Kundli matching\n- Life predictions (Marriage, Career, etc.)\n- Dosha check\n- Panchang\n\nJust ask!"
+  },
+
+  "flow": {
+    "birth_details": {
+      "date": "What is your date of birth?",
+      "date_example": "(e.g., 15-08-1990)",
+      "time": "What was your time of birth?",
+      "time_example": "(e.g., 10:30 AM)",
+      "place": "Where were you born? (City/Town)",
+      "place_example": "(e.g., Delhi, Mumbai)",
+      "invalid_date": "Please enter date as DD-MM-YYYY",
+      "invalid_time": "Please enter time like 10:30 AM or 14:30",
+      "invalid_place": "Please enter a valid city or town name",
+      "collected": "Got your birth details!"
+    },
+    "life_prediction": {
+      "type": "What would you like to know about?",
+      "options": "1. Marriage\n2. Career\n3. Health\n4. Wealth\n5. Children\n6. Foreign Travel"
+    },
+    "kundli_matching": {
+      "intro": "I'll help you with Kundli matching. I'll need birth details for both people.",
+      "person1_name": "What is the first person's name?",
+      "person1_details": "Please provide the first person's birth details.",
+      "person2_name": "What is the second person's name?",
+      "person2_details": "Now please provide the second person's birth details."
+    },
+    "dosha_check": {
+      "type": "Which dosha would you like to check?",
+      "options": "1. Manglik Dosha\n2. Kaal Sarp Dosha\n3. Sade Sati\n4. Pitra Dosha\n5. All Doshas"
+    },
+    "confirmation": {
+      "yes_no": "Please reply with Yes or No."
+    },
+    "retry": {
+      "too_many": "Too many invalid attempts. Please start over.",
+      "try_again": "That doesn't look right. Please try again."
+    }
+  },
+
+  "horoscope": {
+    "intro": "Here's your {sign} horoscope for {period}:",
+    "today": "today",
+    "this_week": "this week",
+    "this_month": "this month",
+    "overall": "Overall: {text}",
+    "love": "Love: {text}",
+    "career": "Career: {text}",
+    "health": "Health: {text}",
+    "lucky_number": "Lucky Number: {number}",
+    "lucky_color": "Lucky Color: {color}",
+    "advice": "Advice: {text}"
+  },
+
+  "birth_chart": {
+    "intro": "Here's your birth chart (Kundli):",
+    "sun_sign": "Sun Sign: {sign}",
+    "moon_sign": "Moon Sign: {sign}",
+    "ascendant": "Ascendant (Lagna): {sign}",
+    "nakshatra": "Moon Nakshatra: {nakshatra}",
+    "planetary_positions": "Planetary Positions:",
+    "dasha": "Current Dasha: {dasha}"
+  },
+
+  "life_prediction": {
+    "marriage": {
+      "title": "Marriage Prediction",
+      "intro": "Based on your 7th house and Venus placement:"
+    },
+    "career": {
+      "title": "Career Prediction",
+      "intro": "Based on your 10th house analysis:"
+    },
+    "health": {
+      "title": "Health Prediction",
+      "intro": "Based on your 6th house and Mars placement:"
+    },
+    "wealth": {
+      "title": "Wealth Prediction",
+      "intro": "Based on your 2nd and 11th house analysis:"
+    },
+    "children": {
+      "title": "Children Prediction",
+      "intro": "Based on your 5th house and Jupiter placement:"
+    },
+    "foreign": {
+      "title": "Foreign Travel Prediction",
+      "intro": "Based on your 9th and 12th house analysis:"
+    }
+  },
+
+  "kundli_matching": {
+    "title": "Kundli Matching Report",
+    "intro": "Compatibility analysis for {person1} and {person2}:",
+    "score": "Gun Milan Score: {score}/36",
+    "compatible": "This is considered a good match!",
+    "average": "This is an average match. Some adjustments may be needed.",
+    "low": "The score is on the lower side. Please consult an astrologer.",
+    "nadi_dosha": "Nadi Dosha: {status}",
+    "bhakoot_dosha": "Bhakoot Dosha: {status}",
+    "recommendations": "Recommendations:"
+  },
+
+  "dosha": {
+    "manglik": {
+      "title": "Manglik Dosha Check",
+      "present": "Manglik Dosha is present in your chart.",
+      "absent": "You don't have Manglik Dosha.",
+      "partial": "Partial Manglik Dosha detected."
+    },
+    "kaal_sarp": {
+      "title": "Kaal Sarp Dosha Check",
+      "present": "Kaal Sarp Dosha is present.",
+      "absent": "No Kaal Sarp Dosha found."
+    },
+    "sade_sati": {
+      "title": "Sade Sati Check",
+      "active": "You are currently in Sade Sati period.",
+      "not_active": "Sade Sati is not active for you.",
+      "phase": "Current Phase: {phase}"
+    },
+    "pitra": {
+      "title": "Pitra Dosha Check",
+      "present": "Pitra Dosha indicators found.",
+      "absent": "No Pitra Dosha detected."
+    },
+    "remedies": "Suggested Remedies:"
+  },
+
+  "panchang": {
+    "title": "Today's Panchang",
+    "date": "Date: {date}",
+    "tithi": "Tithi: {tithi}",
+    "nakshatra": "Nakshatra: {nakshatra}",
+    "yoga": "Yoga: {yoga}",
+    "karan": "Karan: {karan}",
+    "sunrise": "Sunrise: {time}",
+    "sunset": "Sunset: {time}",
+    "rahu_kaal": "Rahu Kaal: {time}",
+    "auspicious": "Good for: {activities}",
+    "inauspicious": "Avoid: {activities}"
+  },
+
+  "errors": {
+    "missing_birth_details": "I need your birth details to provide this prediction. Please share your date, time, and place of birth.",
+    "invalid_zodiac": "Please provide a valid zodiac sign (e.g., Aries, Taurus, etc.)",
+    "calculation_error": "There was an error calculating your chart. Please verify your birth details.",
+    "service_unavailable": "This service is temporarily unavailable. Please try again later."
+  }
+}

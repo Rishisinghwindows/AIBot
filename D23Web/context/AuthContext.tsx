@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback, useRef } from 'react';
 import { User, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { auth, isFirebaseConfigured } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 
 interface UserProfile {
@@ -123,6 +123,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }, 5000);
 
+    if (!auth || !isFirebaseConfigured) {
+      console.warn("[Auth] Firebase not configured, skipping auth");
+      setLoading(false);
+      return;
+    }
+
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
       authStateReceived = true;
       clearTimeout(loadingTimeout);
@@ -182,6 +188,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [fetchProfile]);
 
   const login = async () => {
+    if (!auth || !isFirebaseConfigured) {
+      console.error("[Auth] Firebase not configured");
+      return;
+    }
     setLoading(true);
     try {
       const provider = new GoogleAuthProvider();
@@ -211,7 +221,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      await signOut(auth);
+      if (auth) {
+        await signOut(auth);
+      }
       setCurrentProfile(null);
       setAccessToken(null);
       setRefreshToken(null);
@@ -262,10 +274,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           localStorage.removeItem("firebase_id_token");
         }
         // Sign out of Firebase too
-        try {
-          await signOut(auth);
-        } catch (e) {
-          console.error("[Auth] Error signing out of Firebase:", e);
+        if (auth) {
+          try {
+            await signOut(auth);
+          } catch (e) {
+            console.error("[Auth] Error signing out of Firebase:", e);
+          }
         }
         router.push('/login');
         return null;

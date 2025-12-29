@@ -11,17 +11,33 @@ const _geistMono = Geist_Mono({ subsets: ["latin"] })
 export const metadata: Metadata = {
   title: "D23 AI | Bharat's WhatsApp AI",
   description: "Meet Bharat's first WhatsApp-native AI assistant for every language and every question.",
-  generator: "d23.ai recreation",
+  generator: "d23.ai",
+  metadataBase: new URL("https://d23ai.in"),
   icons: {
-    icon: [
+    icon: "/d23-logo.png",
+    apple: "/apple-icon.png",
+  },
+  openGraph: {
+    title: "D23 AI | Bharat's WhatsApp AI",
+    description: "Meet Bharat's first WhatsApp-native AI assistant for every language and every question.",
+    url: "https://d23ai.in",
+    siteName: "D23 AI",
+    locale: "en_IN",
+    type: "website",
+    images: [
       {
-        url: "/puch/puch_ai.png",
-      },
-      {
-        url: "/puch/logo.png",
+        url: "/d23-og.png",
+        width: 1200,
+        height: 630,
+        alt: "D23 AI - Bharat's WhatsApp AI Assistant",
       },
     ],
-    apple: "/puch/puch_ai.png",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "D23 AI | Bharat's WhatsApp AI",
+    description: "Meet Bharat's first WhatsApp-native AI assistant for every language and every question.",
+    images: ["/d23-og.png"],
   },
 }
 

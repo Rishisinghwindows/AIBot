@@ -23,7 +23,18 @@
       "WebSearch",
       "Bash(python3:*)",
       "Bash(grep:*)",
-      "Bash(xargs kill -9)"
+      "Bash(xargs kill -9)",
+      "Bash(pip3 install:*)",
+      "Bash(pip install:*)",
+      "Bash(./venv/bin/uvicorn:*)",
+      "Bash(/opt/homebrew/bin/python3.12:*)",
+      "Bash(brew services:*)",
+      "Bash(PGPASSWORD=postgres psql:*)",
+      "Bash(brew --prefix:*)",
+      "Bash(pg_config:*)",
+      "Bash(PGPASSWORD=password psql:*)",
+      "Bash(./venv/bin/alembic upgrade:*)",
+      "Bash(cp:*)"
     ]
   }
 }
