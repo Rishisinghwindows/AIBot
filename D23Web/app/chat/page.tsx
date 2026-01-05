@@ -23,6 +23,7 @@ import {
   StopCircle,
 } from "lucide-react";
 import { ChatMessage, Conversation } from "@/lib/types";
+import authFetch from "@/lib/auth_fetch";
 import { ChatSidebar } from "@/components/chat/ChatSidebar";
 import { ChatHeader } from "@/components/chat/ChatHeader";
 import { ChatArea } from "@/components/chat/ChatArea";
@@ -88,7 +89,12 @@ export default function ChatPage() {
   // Tool menu state
   const [showToolMenu, setShowToolMenu] = useState<boolean>(false);
 
-  const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  // Image upload state
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const apiBase = "/api"; // Use Next.js proxy to avoid CORS
 
   // Quick tools configuration
   const quickTools = [
@@ -333,109 +339,51 @@ export default function ChatPage() {
     }
 
     try {
-      // If user is authenticated, use the authenticated flow
+      let response: Response;
+      let data: Record<string, unknown>;
+
+      // Use authenticated endpoint if user is logged in (for Gmail, integrations)
       if (accessToken) {
-        let actualConversationId = currentConversationId;
+        const requestBody = {
+          message: userMessage.content,
+          conversation_id: currentConversationId || undefined,
+          tools: [
+            "gmail", "gmail_send", "weather", "image", "news", "travel", "horoscope",
+            "github_repos", "github_search_issues", "github_search_code", "github_list_issues",
+            "github_create_issue", "github_list_commits", "github_list_prs", "github_my_open_prs", "github_list_branches",
+            "github_get_file", "github_fork", "github_create_branch", "github_create_pr", "github_mcp_tool"
+          ],
+        };
 
-        // Create new conversation if needed
-        if (!actualConversationId) {
-          const newConvResponse = await fetch(`${apiBase}/chat/conversations`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${accessToken}`,
-            },
-            body: JSON.stringify({
-              title: userMessage.content.substring(0, 50) + (userMessage.content.length > 50 ? "..." : ""),
-            }),
-          });
-          if (!newConvResponse.ok) throw new Error("Failed to create new conversation");
-          const newConversation: Conversation = await newConvResponse.json();
-          actualConversationId = newConversation.id;
-          setCurrentConversationId(actualConversationId);
-          setConversations((prev) => [newConversation, ...prev]);
-        }
-
-        // Send message via streaming endpoint
-        const response = await fetch(`${apiBase}/chat/ask`, {
+        response = await authFetch(`${apiBase}/chat/send`, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${accessToken}`,
-          },
-          body: JSON.stringify({
-            message: userMessage.content,
-            conversation_id: actualConversationId,
-          }),
-        });
+          body: JSON.stringify(requestBody),
+        }, accessToken);
 
-        if (!response.ok || !response.body) {
+        if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder("utf-8");
-        let aiFullResponse = "";
-        let partialLine = "";
-        let mediaUrl: string | undefined;
-        let intent: string | undefined;
-        let structuredData: Record<string, unknown> | undefined;
+        data = await response.json();
 
-        while (true) {
-          const { done, value } = await reader.read();
-          partialLine += decoder.decode(value || new Uint8Array(), { stream: !done });
-
-          const lines = partialLine.split("\n");
-          partialLine = lines.pop() || "";
-
-          for (const line of lines) {
-            if (line.startsWith("event:")) {
-              continue;
-            }
-            if (line.startsWith("data:")) {
-              const data = line.replace(/^data:\s*/, "").trim();
-              if (!data) continue;
-
-              try {
-                const parsed = JSON.parse(data);
-
-                if (parsed.content) {
-                  setCurrentAIMessage((prev) => prev + parsed.content);
-                  aiFullResponse += parsed.content;
-                }
-                if (parsed.media_url) {
-                  mediaUrl = parsed.media_url;
-                }
-                // Extract intent and structured_data from metadata event
-                if (parsed.intent) {
-                  intent = parsed.intent;
-                }
-                if (parsed.structured_data) {
-                  structuredData = parsed.structured_data;
-                }
-              } catch {
-                // Not valid JSON, skip
-              }
-            }
-          }
-
-          if (done) break;
+        // Update conversation ID if new
+        if (data.conversation_id && !currentConversationId) {
+          setCurrentConversationId(data.conversation_id as string);
         }
 
         const aiMessage: ChatMessage = {
-          id: crypto.randomUUID(),
-          conversation_id: actualConversationId,
+          id: (data.assistant_message as Record<string, unknown>)?.id as string || crypto.randomUUID(),
+          conversation_id: data.conversation_id as string || "authenticated",
           role: "assistant",
-          content: aiFullResponse,
+          content: (data.assistant_message as Record<string, unknown>)?.content as string || "No response",
           created_at: new Date().toISOString(),
-          media_url: mediaUrl,
-          intent: intent,
-          structured_data: structuredData,
+          media_url: ((data.assistant_message as Record<string, unknown>)?.media_url as string) || undefined,
+          intent: ((data.assistant_message as Record<string, unknown>)?.intent as string) || undefined,
+          structured_data: (data.assistant_message as Record<string, unknown>)?.structured_data as Record<string, unknown> | undefined,
         };
         setMessages((prev) => [...prev, aiMessage]);
-        setCurrentAIMessage("");
       } else {
-        // Anonymous chat flow using web session
+        // Anonymous user - use web session flow
         const sessionId = await getWebSession();
 
         // Build request body with optional location
@@ -453,7 +401,7 @@ export default function ChatPage() {
           };
         }
 
-        const response = await fetch(`${apiBase}/web/chat`, {
+        response = await fetch(`${apiBase}/web/chat`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(requestBody),
@@ -463,17 +411,17 @@ export default function ChatPage() {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        const data = await response.json();
+        data = await response.json();
 
         const aiMessage: ChatMessage = {
-          id: data.assistant_message?.id || crypto.randomUUID(),
+          id: (data.assistant_message as Record<string, unknown>)?.id as string || crypto.randomUUID(),
           conversation_id: "anonymous",
           role: "assistant",
-          content: data.assistant_message?.content || data.response || "No response",
+          content: (data.assistant_message as Record<string, unknown>)?.content as string || data.response as string || "No response",
           created_at: new Date().toISOString(),
-          media_url: data.assistant_message?.media_url,
-          intent: data.assistant_message?.intent,
-          structured_data: data.assistant_message?.structured_data,
+          media_url: ((data.assistant_message as Record<string, unknown>)?.media_url as string) || undefined,
+          intent: ((data.assistant_message as Record<string, unknown>)?.intent as string) || undefined,
+          structured_data: (data.assistant_message as Record<string, unknown>)?.structured_data as Record<string, unknown> | undefined,
         };
         setMessages((prev) => [...prev, aiMessage]);
 
@@ -619,6 +567,101 @@ export default function ChatPage() {
   const handleLocationDismiss = () => {
     setShowLocationPrompt(false);
     setPendingLocationMessage(null);
+  };
+
+  // Image upload handlers
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith("image/")) {
+        alert("Please select an image file");
+        return;
+      }
+      // Validate file size (max 20MB)
+      if (file.size > 20 * 1024 * 1024) {
+        alert("Image too large. Maximum size is 20MB");
+        return;
+      }
+      setSelectedImage(file);
+      // Create preview
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const clearSelectedImage = () => {
+    setSelectedImage(null);
+    setImagePreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const handleSendImageMessage = async () => {
+    if (!selectedImage || isSending) return;
+
+    const userMessage: ChatMessage = {
+      id: crypto.randomUUID(),
+      conversation_id: "anonymous",
+      role: "user",
+      content: inputMessage.trim() || "What's in this image?",
+      created_at: new Date().toISOString(),
+      media_url: imagePreview || undefined,
+    };
+
+    setMessages((prev) => [...prev, userMessage]);
+    setIsSending(true);
+    const imageToSend = selectedImage;
+    const messageToSend = inputMessage.trim() || "What's in this image?";
+    clearSelectedImage();
+    setInputMessage("");
+
+    try {
+      const sessionId = await getWebSession();
+      const formData = new FormData();
+      formData.append("image", imageToSend);
+      formData.append("session_id", sessionId);
+      formData.append("message", messageToSend);
+
+      const response = await fetch(`${apiBase}/web/chat/image`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      const aiMessage: ChatMessage = {
+        id: data.assistant_message?.id || crypto.randomUUID(),
+        conversation_id: "anonymous",
+        role: "assistant",
+        content: data.assistant_message?.content || "I couldn't analyze this image.",
+        created_at: new Date().toISOString(),
+        intent: "image_analysis",
+      };
+      setMessages((prev) => [...prev, aiMessage]);
+    } catch (error) {
+      console.error("Error sending image:", error);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          conversation_id: "anonymous",
+          role: "assistant",
+          content: `Error analyzing image: ${error instanceof Error ? error.message : String(error)}`,
+          created_at: new Date().toISOString(),
+        },
+      ]);
+    } finally {
+      setIsSending(false);
+    }
   };
 
   // Voice recording handlers
@@ -793,46 +836,7 @@ export default function ChatPage() {
     );
   }
 
-  // Require authentication - show login screen if not authenticated
-  if (!currentUser) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-black">
-        <div className="flex flex-col items-center gap-6 max-w-md mx-auto px-4 text-center">
-          {/* Logo */}
-          <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-violet-500 via-fuchsia-500 to-pink-500 p-[2px]">
-            <div className="w-full h-full rounded-2xl bg-black flex items-center justify-center">
-              <Sparkles className="w-10 h-10 text-violet-400" />
-            </div>
-          </div>
-
-          {/* Title */}
-          <div>
-            <h1 className="text-3xl font-bold text-white mb-2">Welcome to D23 AI</h1>
-            <p className="text-zinc-400">Sign in to start chatting with your AI assistant</p>
-          </div>
-
-          {/* Sign In Button */}
-          <Button
-            onClick={login}
-            className="w-full max-w-xs bg-white hover:bg-zinc-100 text-black font-medium py-6 rounded-xl flex items-center justify-center gap-3"
-          >
-            <svg className="w-5 h-5" viewBox="0 0 24 24">
-              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-            </svg>
-            Sign in with Google
-          </Button>
-
-          {/* Footer */}
-          <p className="text-xs text-zinc-500">
-            By signing in, you agree to our Terms of Service and Privacy Policy
-          </p>
-        </div>
-      </div>
-    );
-  }
+  // Anonymous chat is allowed - no login required
 
   const userInitials = currentUser
     ? (currentProfile?.display_name?.substring(0, 2).toUpperCase() ||
@@ -935,6 +939,34 @@ export default function ChatPage() {
         {/* Input Area */}
         <div className="flex-shrink-0 border-t border-zinc-800 p-4 bg-black/50 backdrop-blur-xl">
           <div className="max-w-3xl mx-auto space-y-3">
+            {/* Suggestion Chips - Always visible above input */}
+            {!isSending && (
+              <div className="flex flex-wrap gap-2 justify-center pb-2">
+                {[
+                  { label: "🌤️ Weather in Delhi", prompt: "What's the weather in Delhi?" },
+                  { label: "🍕 Pizza near me", prompt: "Pizza near me" },
+                  { label: "🎨 Generate image", prompt: "Generate an image of a sunset over mountains" },
+                  { label: "🚂 PNR Status", prompt: "Check PNR " },
+                  { label: "📰 Today's news", prompt: "Show me today's top news" },
+                  { label: "⭐ My horoscope", prompt: "My horoscope for today" },
+                  { label: "🔮 Numerology", prompt: "Numerology for my name" },
+                  { label: "📧 Read emails", prompt: "Show my latest emails" },
+                ].map((suggestion, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => {
+                      setInputMessage(suggestion.prompt);
+                      inputRef.current?.focus();
+                    }}
+                    className="px-3 py-1.5 text-sm bg-zinc-800/60 hover:bg-zinc-700/80 text-zinc-300 hover:text-white rounded-full border border-zinc-700/50 hover:border-zinc-600 transition-all duration-200"
+                  >
+                    {suggestion.label}
+                  </button>
+                ))}
+              </div>
+            )}
+
             {/* Location Prompt */}
             {showLocationPrompt && (
               <LocationPrompt
@@ -959,7 +991,41 @@ export default function ChatPage() {
               </div>
             )}
 
-            <form onSubmit={handleSendMessage}>
+            {/* Image Preview */}
+            {imagePreview && (
+              <div className="relative inline-block">
+                <img
+                  src={imagePreview}
+                  alt="Selected"
+                  className="max-h-32 rounded-lg border border-zinc-700"
+                />
+                <button
+                  type="button"
+                  onClick={clearSelectedImage}
+                  className="absolute -top-2 -right-2 p-1 bg-red-500 rounded-full text-white hover:bg-red-600 transition-colors"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            )}
+
+            {/* Hidden File Input */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleImageSelect}
+              className="hidden"
+            />
+
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              if (selectedImage) {
+                handleSendImageMessage();
+              } else {
+                handleSendMessage(e);
+              }
+            }}>
               <div className="relative flex items-end gap-2">
                 {/* Tool Selection Button */}
                 <TooltipProvider delayDuration={300}>
@@ -1031,6 +1097,31 @@ export default function ChatPage() {
                   )}
                 </div>
 
+                {/* Image Upload Button */}
+                <TooltipProvider delayDuration={300}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isSending || isRecording || isTranscribing}
+                        className={`h-10 w-10 rounded-full flex-shrink-0 transition-all ${
+                          selectedImage
+                            ? "bg-violet-500/20 text-violet-400 hover:bg-violet-500/30"
+                            : "text-zinc-400 hover:text-white hover:bg-zinc-800"
+                        }`}
+                      >
+                        <Paperclip className="w-5 h-5" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      <p>Upload image</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+
                 {/* Voice Input Button */}
                 <TooltipProvider delayDuration={300}>
                   <Tooltip>
@@ -1064,9 +1155,9 @@ export default function ChatPage() {
                 <Button
                   type="submit"
                   size="icon"
-                  disabled={isSending || !inputMessage.trim() || isRecording || isTranscribing}
+                  disabled={isSending || (!inputMessage.trim() && !selectedImage) || isRecording || isTranscribing}
                   className={`h-12 w-12 rounded-full flex-shrink-0 transition-all ${
-                    inputMessage.trim() && !isSending
+                    (inputMessage.trim() || selectedImage) && !isSending
                       ? "bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-lg shadow-violet-500/25 hover:shadow-violet-500/40"
                       : "bg-zinc-800 text-zinc-500"
                   }`}

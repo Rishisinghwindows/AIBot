@@ -48,17 +48,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     try {
       // First authenticate with backend to get our JWT tokens
-      const authResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/google`, {
+      const authResponse = await fetch(`/api/auth/google`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ firebase_id_token: token }),
+        body: JSON.stringify({ id_token: token, firebase_id_token: token }),
       });
 
       console.log("[Auth] Backend auth response status:", authResponse.status);
 
       if (!authResponse.ok) {
+        // If backend doesn't have auth endpoints (404), continue without backend auth
+        if (authResponse.status === 404) {
+          console.warn("[Auth] Backend auth endpoint not available, continuing without backend auth");
+          profileFetched.current = true;
+          return;
+        }
         const errorText = await authResponse.text();
         console.error("[Auth] Backend auth failed:", errorText);
         throw new Error(`Failed to authenticate with backend: ${errorText}`);
@@ -79,7 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       // Fetch user profile with the new access token
-      const profileResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/me`, {
+      const profileResponse = await fetch(`/api/auth/me`, {
         headers: {
           Authorization: `Bearer ${authData.access_token}`,
         },
@@ -209,7 +215,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Logout from backend
       if (refreshToken) {
         try {
-          await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/logout`, {
+          await fetch(`/api/auth/logout`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -253,7 +259,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     try {
       console.log("[Auth] Attempting to refresh access token...");
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/refresh`, {
+      const response = await fetch(`/api/auth/refresh`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -85,7 +85,7 @@ export function ConnectionsPanel({ isLoggedIn, onLoginClick, onManageClick }: Co
   const [toolsExpanded, setToolsExpanded] = useState(true);
   const [providersExpanded, setProvidersExpanded] = useState(true);
 
-  const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  const apiBase = "/api"; // Use Next.js proxy to avoid CORS
 
   useEffect(() => {
     const fetchTools = async () => {
@@ -154,15 +154,15 @@ export function ConnectionsPanel({ isLoggedIn, onLoginClick, onManageClick }: Co
                 ) : (
                   tools.slice(0, 6).map((tool) => (
                     <div
-                      key={tool.name}
+                      key={tool.name || 'unknown'}
                       className="flex items-center gap-2.5 px-2 py-1.5 rounded-md hover:bg-accent/50 transition-colors group"
                     >
                       <div className="p-1.5 rounded-md bg-primary/10 text-primary">
-                        {toolIcons[tool.name.toLowerCase()] || <Wrench className="h-4 w-4" />}
+                        {toolIcons[(tool.name || '').toLowerCase()] || <Wrench className="h-4 w-4" />}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-foreground truncate capitalize">
-                          {tool.name.replace(/_/g, " ")}
+                          {(tool.name || 'Unknown').replace(/_/g, " ")}
                         </p>
                       </div>
                       <div className="flex items-center gap-1">
