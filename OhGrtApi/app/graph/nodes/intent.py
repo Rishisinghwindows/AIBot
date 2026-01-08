@@ -14,6 +14,8 @@ from pydantic import BaseModel, Field
 from app.graph.state import BotState
 from app.config import get_settings
 from app.logger import logger
+from app.i18n.constants import RASHI_TO_ENGLISH, ZODIAC_SIGNS
+from app.i18n.detector import detect_language
 
 
 class IntentClassification(BaseModel):
@@ -81,7 +83,7 @@ def detect_intent(state: BotState) -> dict:
         state: Current bot state with message
 
     Returns:
-        Updated state dict with intent, confidence, and entities
+        Updated state dict with intent, confidence, entities, and detected_language
     """
     user_message = state["whatsapp_message"].get("text", "")
 
@@ -91,12 +93,35 @@ def detect_intent(state: BotState) -> dict:
             "intent_confidence": 1.0,
             "extracted_entities": {},
             "current_query": "",
+            "detected_language": "en",
             "error": None,
         }
+
+    # Detect user's language for response localization
+    detected_lang = detect_language(user_message, default="en")
 
     user_lower = user_message.lower()
 
     # Quick pattern matching for common cases (faster than LLM)
+
+    # Help / What can you do - CHECK FIRST
+    help_keywords = [
+        "what can you do", "what do you do", "what are your features",
+        "what services", "how can you help", "what can i ask",
+        "show me what you can do", "help me", "what all can you do",
+        "your capabilities", "your features", "what you can do",
+        "what are you capable", "what all you can", "tell me what you can"
+    ]
+    if any(kw in user_lower for kw in help_keywords):
+        logger.info(f"Help intent detected: {user_message}")
+        return {
+            "intent": "help",
+            "intent_confidence": 0.95,
+            "extracted_entities": {},
+            "current_query": user_message,
+            "detected_language": detected_lang,
+            "error": None,
+        }
 
     # PNR pattern (10 digits)
     pnr_match = extract_pnr(user_message)
@@ -106,6 +131,7 @@ def detect_intent(state: BotState) -> dict:
             "intent_confidence": 0.95,
             "extracted_entities": {"pnr": pnr_match},
             "current_query": user_message,
+            "detected_language": detected_lang,
             "error": None,
         }
 
@@ -123,13 +149,19 @@ def detect_intent(state: BotState) -> dict:
             }
 
     # Image generation
-    image_keywords = ["generate image", "create image", "make image", "draw", "image of"]
+    image_keywords = [
+        "generate image", "create image", "make image", "draw",
+        "generate a", "create a picture", "make a picture",
+        "generate picture", "create picture", "make picture",
+        "image of", "picture of",
+    ]
     if any(kw in user_lower for kw in image_keywords):
         return {
             "intent": "image",
             "intent_confidence": 0.9,
             "extracted_entities": {"image_prompt": user_message},
             "current_query": user_message,
+            "detected_language": detected_lang,
             "error": None,
         }
 
@@ -144,6 +176,7 @@ def detect_intent(state: BotState) -> dict:
             "intent_confidence": 0.9,
             "extracted_entities": {"city": city},
             "current_query": user_message,
+            "detected_language": detected_lang,
             "error": None,
         }
 
@@ -177,6 +210,7 @@ def detect_intent(state: BotState) -> dict:
             "intent_confidence": 0.9,
             "extracted_entities": {"news_query": news_query, "news_category": news_category},
             "current_query": user_message,
+            "detected_language": detected_lang,
             "error": None,
         }
 
@@ -188,6 +222,7 @@ def detect_intent(state: BotState) -> dict:
             "intent_confidence": 0.85,
             "extracted_entities": {"query": user_message},
             "current_query": user_message,
+            "detected_language": detected_lang,
             "error": None,
         }
 
@@ -199,6 +234,7 @@ def detect_intent(state: BotState) -> dict:
             "intent_confidence": 0.9,
             "extracted_entities": {},
             "current_query": user_message,
+            "detected_language": detected_lang,
             "error": None,
         }
 
@@ -220,6 +256,7 @@ def detect_intent(state: BotState) -> dict:
             "intent_confidence": 0.85,
             "extracted_entities": {"reminder_text": user_message},
             "current_query": user_message,
+            "detected_language": detected_lang,
             "error": None,
         }
 
@@ -231,6 +268,7 @@ def detect_intent(state: BotState) -> dict:
             "intent_confidence": 0.9,
             "extracted_entities": {},
             "current_query": user_message,
+            "detected_language": detected_lang,
             "error": None,
         }
 
@@ -249,6 +287,7 @@ def detect_intent(state: BotState) -> dict:
             "intent_confidence": 0.95,
             "extracted_entities": {"spread_type": spread_type},
             "current_query": user_message,
+            "detected_language": detected_lang,
             "error": None,
         }
 
@@ -265,6 +304,7 @@ def detect_intent(state: BotState) -> dict:
             "intent_confidence": 0.95,
             "extracted_entities": {"name": extracted_name, "birth_date": extracted_date},
             "current_query": user_message,
+            "detected_language": detected_lang,
             "error": None,
         }
 
@@ -276,6 +316,7 @@ def detect_intent(state: BotState) -> dict:
             "intent_confidence": 0.95,
             "extracted_entities": {},
             "current_query": user_message,
+            "detected_language": detected_lang,
             "error": None,
         }
 
@@ -289,6 +330,7 @@ def detect_intent(state: BotState) -> dict:
             "intent_confidence": 0.95,
             "extracted_entities": {"birth_date": extracted_date},
             "current_query": user_message,
+            "detected_language": detected_lang,
             "error": None,
         }
 
@@ -307,6 +349,7 @@ def detect_intent(state: BotState) -> dict:
             "intent_confidence": 0.95,
             "extracted_entities": {"specific_dosha": specific_dosha},
             "current_query": user_message,
+            "detected_language": detected_lang,
             "error": None,
         }
 
@@ -325,6 +368,7 @@ def detect_intent(state: BotState) -> dict:
             "intent_confidence": 0.95,
             "extracted_entities": {"prediction_type": prediction_type},
             "current_query": user_message,
+            "detected_language": detected_lang,
             "error": None,
         }
 
@@ -336,6 +380,7 @@ def detect_intent(state: BotState) -> dict:
             "intent_confidence": 0.95,
             "extracted_entities": {"location": "Delhi"},
             "current_query": user_message,
+            "detected_language": detected_lang,
             "error": None,
         }
 
@@ -353,6 +398,7 @@ def detect_intent(state: BotState) -> dict:
             "intent_confidence": 0.95,
             "extracted_entities": {"question": user_message},
             "current_query": user_message,
+            "detected_language": detected_lang,
             "error": None,
         }
 
@@ -364,25 +410,45 @@ def detect_intent(state: BotState) -> dict:
             "intent_confidence": 0.9,
             "extracted_entities": {"question": user_message},
             "current_query": user_message,
+            "detected_language": detected_lang,
             "error": None,
         }
 
-    # Horoscope
-    zodiac_signs = ["aries", "taurus", "gemini", "cancer", "leo", "virgo",
+    # Horoscope - supports English, Hindi, and transliterated zodiac signs
+    zodiac_signs_english = ["aries", "taurus", "gemini", "cancer", "leo", "virgo",
                     "libra", "scorpio", "sagittarius", "capricorn", "aquarius", "pisces"]
-    horoscope_keywords = ["horoscope", "zodiac", "rashifal"]
 
-    if any(kw in user_lower for kw in horoscope_keywords) or any(sign in user_lower for sign in zodiac_signs):
-        detected_sign = None
-        for sign in zodiac_signs:
-            if sign in user_lower:
-                detected_sign = sign
-                break
+    # Hindi horoscope keywords
+    horoscope_keywords = ["horoscope", "zodiac", "rashifal", "राशिफल", "राशि"]
 
+    def detect_zodiac_sign(text: str, text_lower: str) -> Optional[str]:
+        """Detect zodiac sign from text in any supported language."""
+        # First check English signs
+        for sign in zodiac_signs_english:
+            if sign in text_lower:
+                return sign
+
+        # Check Hindi/transliterated names from RASHI_TO_ENGLISH
+        for hindi_name, english_sign in RASHI_TO_ENGLISH.items():
+            if hindi_name in text or hindi_name in text_lower:
+                return english_sign
+
+        # Check all zodiac translations from ZODIAC_SIGNS
+        for english_sign, translations in ZODIAC_SIGNS.items():
+            for lang, name in translations.items():
+                if name in text or name.lower() in text_lower:
+                    return english_sign
+
+        return None
+
+    detected_sign = detect_zodiac_sign(user_message, user_lower)
+    is_horoscope_query = any(kw in user_lower or kw in user_message for kw in horoscope_keywords)
+
+    if is_horoscope_query or detected_sign:
         period = "today"
-        if "weekly" in user_lower:
+        if "weekly" in user_lower or "साप्ताहिक" in user_message:
             period = "weekly"
-        elif "monthly" in user_lower:
+        elif "monthly" in user_lower or "मासिक" in user_message:
             period = "monthly"
 
         return {
@@ -390,6 +456,7 @@ def detect_intent(state: BotState) -> dict:
             "intent_confidence": 0.95,
             "extracted_entities": {"astro_sign": detected_sign, "astro_period": period},
             "current_query": user_message,
+            "detected_language": detected_lang,
             "error": None,
         }
 
@@ -403,6 +470,7 @@ def detect_intent(state: BotState) -> dict:
                 "intent_confidence": 0.7,
                 "extracted_entities": {},
                 "current_query": user_message,
+                "detected_language": detected_lang,
                 "error": None,
             }
 
@@ -429,6 +497,7 @@ def detect_intent(state: BotState) -> dict:
             "intent_confidence": result.confidence,
             "extracted_entities": result.entities or {},
             "current_query": user_message,
+            "detected_language": detected_lang,
             "error": None,
         }
 
@@ -439,5 +508,6 @@ def detect_intent(state: BotState) -> dict:
             "intent_confidence": 0.5,
             "extracted_entities": {},
             "current_query": user_message,
+            "detected_language": detected_lang,
             "error": f"Intent detection error: {str(e)}",
         }

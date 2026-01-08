@@ -179,14 +179,17 @@ def extract_message(payload: WebhookPayload) -> Optional[dict]:
                     elif msg.interactive.list_reply:
                         text = msg.interactive.list_reply.title
 
-                # Get media ID if present
+                # Get media ID and caption if present
                 media_id = None
-                if msg.type == "image":
+                caption = None
+                if msg.type == "image" and msg.image:
                     media_id = msg.image.id
+                    caption = msg.image.caption
                 elif msg.audio:
                     media_id = msg.audio.id
                 elif msg.document:
                     media_id = msg.document.id
+                    caption = msg.document.caption if msg.document else None
 
                 # Get location data if present
                 location_data = None
@@ -206,6 +209,7 @@ def extract_message(payload: WebhookPayload) -> Optional[dict]:
                     "message_type": msg.type,
                     "text": text,
                     "media_id": media_id,
+                    "caption": caption,
                     "location": location_data,
                 }
 

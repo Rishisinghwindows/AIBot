@@ -28,9 +28,8 @@ function Header() {
     <header className="fixed top-0 left-0 right-0 z-50 bg-black/70 backdrop-blur-xl border-b border-white/10">
       <div className="max-w-7xl mx-auto px-6 py-4">
         <div className="flex items-center justify-between">
-          <Link href="/v5" className="flex items-center gap-2">
-            <Image src="/puch/logo.png" alt="D23" width={40} height={40} />
-            <span className="text-xl font-bold text-white">D23<GradientText>.AI</GradientText></span>
+          <Link href="/" className="flex items-center gap-2">
+            <Image src="/d23ai-logo-v7.svg" alt="D23" width={40} height={40} />
           </Link>
 
           <nav className="hidden md:flex items-center gap-8">
@@ -342,7 +341,7 @@ export default function ContactPage() {
             <div className="flex items-center gap-3">
               <Image src="/puch/logo.png" alt="D23 AI" width={40} height={40} />
               <div>
-                <p className="text-lg font-bold text-white">D23<GradientText>.AI</GradientText></p>
+                <p className="text-lg font-bold text-white">D23 <GradientText>AI</GradientText></p>
                 <p className="text-sm text-zinc-500">WhatsApp-native AI for Bharat.</p>
               </div>
             </div>

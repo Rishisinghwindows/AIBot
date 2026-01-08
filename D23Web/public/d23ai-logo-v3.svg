@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 140" fill="none">
+  <defs>
+    <!-- Sunset gradient -->
+    <linearGradient id="sunsetGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#F97316"/>
+      <stop offset="40%" style="stop-color:#EC4899"/>
+      <stop offset="100%" style="stop-color:#8B5CF6"/>
+    </linearGradient>
+
+    <!-- Shadow -->
+    <filter id="shadow3">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#8B5CF6" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+
+  <!-- Squircle background -->
+  <rect x="10" y="10" width="120" height="120" rx="35" fill="url(#sunsetGrad)" filter="url(#shadow3)"/>
+
+  <!-- Top glass reflection -->
+  <path d="M25 35 Q70 10 115 35 Q115 55 70 45 Q25 55 25 35" fill="white" opacity="0.2"/>
+
+  <!-- D23AI inline -->
+  <text x="70" y="82" text-anchor="middle" font-family="'SF Pro Display', system-ui, sans-serif" font-size="32" font-weight="800" fill="white">
+    <tspan fill="white">D23</tspan><tspan fill="rgba(255,255,255,0.8)" font-weight="600">AI</tspan>
+  </text>
+
+  <!-- Decorative line under text -->
+  <rect x="35" y="92" width="70" height="2" rx="1" fill="white" opacity="0.4"/>
+
+  <!-- Star burst -->
+  <g transform="translate(110, 28)">
+    <path d="M0 -8 L2 -2 L8 0 L2 2 L0 8 L-2 2 L-8 0 L-2 -2 Z" fill="white" opacity="0.9">
+      <animate attributeName="transform" values="scale(1);scale(1.2);scale(1)" dur="2s" repeatCount="indefinite"/>
+    </path>
+  </g>
+</svg>

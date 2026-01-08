@@ -20,14 +20,13 @@ export function Header() {
         <div className="flex h-14 items-center justify-between rounded-2xl border bg-white/80 px-3 shadow-xl shadow-black/5 backdrop-blur">
           <Link href="/" className="flex items-center gap-2">
             <Image
-              src="/d23-logo.png"
+              src="/d23ai-logo-v7.svg"
               alt="D23 AI logo"
               width={36}
               height={36}
               className="h-9 w-9 object-contain"
               priority
             />
-            <span className="text-lg font-semibold text-foreground">D23 AI</span>
           </Link>
 
           <nav className="hidden items-center gap-6 md:flex">

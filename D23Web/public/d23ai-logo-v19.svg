@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 140" fill="none">
+  <defs>
+    <!-- Heartbeat gradient -->
+    <linearGradient id="pulseGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#10B981"/>
+      <stop offset="50%" style="stop-color:#3B82F6"/>
+      <stop offset="100%" style="stop-color:#8B5CF6"/>
+    </linearGradient>
+
+    <!-- Clip path for pulse line -->
+    <clipPath id="pulseClip">
+      <rect x="15" y="40" width="110" height="60"/>
+    </clipPath>
+  </defs>
+
+  <!-- Background -->
+  <rect x="10" y="10" width="120" height="120" rx="26" fill="#111827"/>
+
+  <!-- Grid lines -->
+  <g stroke="rgba(255,255,255,0.05)" stroke-width="1">
+    <line x1="10" y1="50" x2="130" y2="50"/>
+    <line x1="10" y1="70" x2="130" y2="70"/>
+    <line x1="10" y1="90" x2="130" y2="90"/>
+    <line x1="30" y1="10" x2="30" y2="130"/>
+    <line x1="70" y1="10" x2="70" y2="130"/>
+    <line x1="110" y1="10" x2="110" y2="130"/>
+  </g>
+
+  <!-- Animated heartbeat/pulse line -->
+  <g clip-path="url(#pulseClip)">
+    <path d="M-50,70 L0,70 L10,70 L15,50 L25,90 L35,30 L45,110 L55,70 L65,70 L75,70 L85,60 L95,80 L105,70 L115,70 L200,70" fill="none" stroke="url(#pulseGrad)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+      <animate attributeName="d" dur="2s" repeatCount="indefinite" values="
+        M-50,70 L0,70 L10,70 L15,50 L25,90 L35,30 L45,110 L55,70 L65,70 L75,70 L85,60 L95,80 L105,70 L115,70 L200,70;
+        M-50,70 L0,70 L10,70 L15,70 L25,70 L35,50 L45,90 L55,30 L65,110 L75,70 L85,70 L95,60 L105,80 L115,70 L200,70;
+        M-50,70 L0,70 L10,70 L15,70 L25,70 L35,70 L45,50 L55,90 L65,30 L75,110 L85,70 L95,70 L105,60 L115,80 L200,70;
+        M-50,70 L0,70 L10,70 L15,50 L25,90 L35,30 L45,110 L55,70 L65,70 L75,70 L85,60 L95,80 L105,70 L115,70 L200,70
+      "/>
+    </path>
+
+    <!-- Glow effect duplicate -->
+    <path d="M-50,70 L0,70 L10,70 L15,50 L25,90 L35,30 L45,110 L55,70 L65,70 L75,70 L85,60 L95,80 L105,70 L115,70 L200,70" fill="none" stroke="url(#pulseGrad)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" opacity="0.3">
+      <animate attributeName="d" dur="2s" repeatCount="indefinite" values="
+        M-50,70 L0,70 L10,70 L15,50 L25,90 L35,30 L45,110 L55,70 L65,70 L75,70 L85,60 L95,80 L105,70 L115,70 L200,70;
+        M-50,70 L0,70 L10,70 L15,70 L25,70 L35,50 L45,90 L55,30 L65,110 L75,70 L85,70 L95,60 L105,80 L115,70 L200,70;
+        M-50,70 L0,70 L10,70 L15,70 L25,70 L35,70 L45,50 L55,90 L65,30 L75,110 L85,70 L95,70 L105,60 L115,80 L200,70;
+        M-50,70 L0,70 L10,70 L15,50 L25,90 L35,30 L45,110 L55,70 L65,70 L75,70 L85,60 L95,80 L105,70 L115,70 L200,70
+      "/>
+    </path>
+  </g>
+
+  <!-- D23AI text on top -->
+  <rect x="40" y="100" width="60" height="24" rx="6" fill="#111827"/>
+  <text x="70" y="118" text-anchor="middle" font-family="system-ui, sans-serif" font-size="16" font-weight="800" fill="url(#pulseGrad)">D23AI</text>
+
+  <!-- Heart rate number -->
+  <text x="110" y="35" text-anchor="end" font-family="monospace" font-size="14" font-weight="700" fill="#10B981">
+    <tspan>AI</tspan>
+    <animate attributeName="opacity" values="1;0.5;1" dur="1s" repeatCount="indefinite"/>
+  </text>
+
+  <!-- Pulsing indicator -->
+  <circle cx="118" cy="30" r="4" fill="#10B981">
+    <animate attributeName="r" values="4;6;4" dur="1s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="1;0.5;1" dur="1s" repeatCount="indefinite"/>
+  </circle>
+
+  <!-- Border -->
+  <rect x="10" y="10" width="120" height="120" rx="26" fill="none" stroke="url(#pulseGrad)" stroke-width="1.5" opacity="0.5"/>
+</svg>

@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 140" fill="none">
+  <defs>
+    <!-- DNA helix gradient -->
+    <linearGradient id="dnaGrad1" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#06B6D4"/>
+      <stop offset="100%" style="stop-color:#3B82F6"/>
+    </linearGradient>
+    <linearGradient id="dnaGrad2" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#8B5CF6"/>
+      <stop offset="100%" style="stop-color:#EC4899"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect x="10" y="10" width="120" height="120" rx="26" fill="#0F172A"/>
+
+  <!-- DNA Helix strands -->
+  <g opacity="0.6">
+    <!-- Left strand -->
+    <path d="M30,20 Q50,35 30,50 Q10,65 30,80 Q50,95 30,110 Q10,125 30,140" fill="none" stroke="url(#dnaGrad1)" stroke-width="3" stroke-linecap="round">
+      <animate attributeName="d" dur="3s" repeatCount="indefinite" values="
+        M30,20 Q50,35 30,50 Q10,65 30,80 Q50,95 30,110 Q10,125 30,140;
+        M30,20 Q10,35 30,50 Q50,65 30,80 Q10,95 30,110 Q50,125 30,140;
+        M30,20 Q50,35 30,50 Q10,65 30,80 Q50,95 30,110 Q10,125 30,140
+      "/>
+    </path>
+    <!-- Right strand -->
+    <path d="M110,20 Q90,35 110,50 Q130,65 110,80 Q90,95 110,110 Q130,125 110,140" fill="none" stroke="url(#dnaGrad2)" stroke-width="3" stroke-linecap="round">
+      <animate attributeName="d" dur="3s" repeatCount="indefinite" values="
+        M110,20 Q90,35 110,50 Q130,65 110,80 Q90,95 110,110 Q130,125 110,140;
+        M110,20 Q130,35 110,50 Q90,65 110,80 Q130,95 110,110 Q90,125 110,140;
+        M110,20 Q90,35 110,50 Q130,65 110,80 Q90,95 110,110 Q130,125 110,140
+      "/>
+    </path>
+
+    <!-- Connecting base pairs -->
+    <line x1="30" y1="35" x2="110" y2="35" stroke="rgba(255,255,255,0.2)" stroke-width="1">
+      <animate attributeName="x1" values="30;50;30" dur="3s" repeatCount="indefinite"/>
+      <animate attributeName="x2" values="110;90;110" dur="3s" repeatCount="indefinite"/>
+    </line>
+    <line x1="30" y1="65" x2="110" y2="65" stroke="rgba(255,255,255,0.2)" stroke-width="1">
+      <animate attributeName="x1" values="30;10;30" dur="3s" repeatCount="indefinite"/>
+      <animate attributeName="x2" values="110;130;110" dur="3s" repeatCount="indefinite"/>
+    </line>
+    <line x1="30" y1="95" x2="110" y2="95" stroke="rgba(255,255,255,0.2)" stroke-width="1">
+      <animate attributeName="x1" values="30;50;30" dur="3s" repeatCount="indefinite"/>
+      <animate attributeName="x2" values="110;90;110" dur="3s" repeatCount="indefinite"/>
+    </line>
+  </g>
+
+  <!-- Center badge -->
+  <rect x="35" y="50" width="70" height="40" rx="10" fill="#0F172A"/>
+  <rect x="35" y="50" width="70" height="40" rx="10" fill="none" stroke="url(#dnaGrad1)" stroke-width="1.5"/>
+
+  <!-- D23AI text -->
+  <text x="70" y="77" text-anchor="middle" font-family="system-ui, sans-serif" font-size="24" font-weight="800" letter-spacing="-1" fill="white">D23AI</text>
+
+  <!-- Animated nodes on strands -->
+  <circle r="4" fill="url(#dnaGrad1)">
+    <animateMotion dur="3s" repeatCount="indefinite" path="M30,20 Q50,35 30,50 Q10,65 30,80 Q50,95 30,110"/>
+  </circle>
+  <circle r="4" fill="url(#dnaGrad2)">
+    <animateMotion dur="3s" repeatCount="indefinite" path="M110,20 Q90,35 110,50 Q130,65 110,80 Q90,95 110,110"/>
+  </circle>
+
+  <!-- Corner accents -->
+  <circle cx="20" cy="20" r="3" fill="#06B6D4" opacity="0.6">
+    <animate attributeName="opacity" values="0.6;0.2;0.6" dur="2s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="120" cy="20" r="3" fill="#8B5CF6" opacity="0.6">
+    <animate attributeName="opacity" values="0.2;0.6;0.2" dur="2s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="20" cy="120" r="3" fill="#3B82F6" opacity="0.6">
+    <animate attributeName="opacity" values="0.4;0.8;0.4" dur="2s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="120" cy="120" r="3" fill="#EC4899" opacity="0.6">
+    <animate attributeName="opacity" values="0.8;0.4;0.8" dur="2s" repeatCount="indefinite"/>
+  </circle>
+</svg>

@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 140" fill="none">
+  <defs>
+    <!-- Holographic gradient -->
+    <linearGradient id="holoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#F0ABFC">
+        <animate attributeName="stop-color" values="#F0ABFC;#67E8F9;#A78BFA;#F0ABFC" dur="4s" repeatCount="indefinite"/>
+      </stop>
+      <stop offset="50%" style="stop-color:#67E8F9">
+        <animate attributeName="stop-color" values="#67E8F9;#A78BFA;#F0ABFC;#67E8F9" dur="4s" repeatCount="indefinite"/>
+      </stop>
+      <stop offset="100%" style="stop-color:#A78BFA">
+        <animate attributeName="stop-color" values="#A78BFA;#F0ABFC;#67E8F9;#A78BFA" dur="4s" repeatCount="indefinite"/>
+      </stop>
+    </linearGradient>
+
+    <filter id="glow7">
+      <feGaussianBlur stdDeviation="2" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Dark base -->
+  <rect x="8" y="8" width="124" height="124" rx="30" fill="#18181B"/>
+
+  <!-- Gradient border -->
+  <rect x="8" y="8" width="124" height="124" rx="30" fill="none" stroke="url(#holoGrad)" stroke-width="2.5"/>
+
+  <!-- Inner glow ring -->
+  <rect x="16" y="16" width="108" height="108" rx="24" fill="none" stroke="url(#holoGrad)" stroke-width="0.5" opacity="0.5"/>
+
+  <!-- D23AI text with glow -->
+  <text x="70" y="78" text-anchor="middle" font-family="system-ui, sans-serif" font-size="32" font-weight="800" letter-spacing="-1" fill="url(#holoGrad)" filter="url(#glow7)">D23AI</text>
+
+  <!-- Scan line effect -->
+  <rect x="20" y="50" width="100" height="1" fill="url(#holoGrad)" opacity="0.3">
+    <animate attributeName="y" values="30;110;30" dur="3s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="0.3;0.1;0.3" dur="3s" repeatCount="indefinite"/>
+  </rect>
+
+  <!-- Corner tech accents -->
+  <path d="M20 35 L20 20 L35 20" fill="none" stroke="url(#holoGrad)" stroke-width="2" stroke-linecap="round"/>
+  <path d="M120 35 L120 20 L105 20" fill="none" stroke="url(#holoGrad)" stroke-width="2" stroke-linecap="round"/>
+  <path d="M20 105 L20 120 L35 120" fill="none" stroke="url(#holoGrad)" stroke-width="2" stroke-linecap="round"/>
+  <path d="M120 105 L120 120 L105 120" fill="none" stroke="url(#holoGrad)" stroke-width="2" stroke-linecap="round"/>
+</svg>

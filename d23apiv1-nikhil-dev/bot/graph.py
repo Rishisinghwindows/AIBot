@@ -36,6 +36,8 @@ from bot.nodes.life_prediction_node import handle_life_prediction
 from bot.nodes.subscription_node import handle_subscription
 from bot.nodes.chat import handle_chat, handle_fallback
 from bot.nodes.help import handle_help
+from bot.nodes.event_node import handle_events
+from bot.nodes.food_node import handle_food
 
 
 def route_by_intent(state: BotState) -> str:
@@ -77,6 +79,10 @@ def route_by_intent(state: BotState) -> str:
         "find_muhurta": "ask_astrologer",  # Route to ask_astrologer for muhurta
         # Subscription management
         "subscription": "subscription",
+        # Events
+        "events": "events",
+        # Food
+        "food_order": "food_order",
         # Help
         "help": "help",
         "chat": "chat",
@@ -137,6 +143,10 @@ def create_graph() -> StateGraph:
     graph.add_node("get_panchang", handle_panchang)
     # Subscription management
     graph.add_node("subscription", handle_subscription)
+    # Events node
+    graph.add_node("events", handle_events)
+    # Food node
+    graph.add_node("food_order", handle_food)
     # Help node
     graph.add_node("help", handle_help)
     # General nodes
@@ -176,6 +186,10 @@ def create_graph() -> StateGraph:
             "get_panchang": "get_panchang",
             # Subscription management
             "subscription": "subscription",
+            # Events
+            "events": "events",
+            # Food
+            "food_order": "food_order",
             # Help
             "help": "help",
             "chat": "chat",
@@ -208,6 +222,10 @@ def create_graph() -> StateGraph:
         "get_panchang",
         # Subscription management
         "subscription",
+        # Events
+        "events",
+        # Food
+        "food_order",
         # Help
         "help",
         "chat",

@@ -108,7 +108,15 @@ async def google_auth(
 
     # Verify Firebase token
     try:
-        firebase_user = firebase_service.verify_id_token(request.firebase_id_token)
+        token = request.token
+        if not token:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="id_token or firebase_id_token is required",
+            )
+        firebase_user = firebase_service.verify_id_token(token)
+    except HTTPException:
+        raise
     except Exception as e:
         logger.warning("google_auth_firebase_failed", error=str(e))
         raise HTTPException(

@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 140" fill="none">
+  <defs>
+    <!-- Deep purple gradient -->
+    <linearGradient id="deepPurple" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4C1D95"/>
+      <stop offset="50%" style="stop-color:#7C3AED"/>
+      <stop offset="100%" style="stop-color:#C084FC"/>
+    </linearGradient>
+
+    <!-- Shine gradient -->
+    <linearGradient id="shine5" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:rgba(255,255,255,0.4)"/>
+      <stop offset="50%" style="stop-color:rgba(255,255,255,0.1)"/>
+      <stop offset="100%" style="stop-color:rgba(255,255,255,0)"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Main shape - rounded hex-ish -->
+  <path d="M70 8 L122 35 L122 105 L70 132 L18 105 L18 35 Z" fill="url(#deepPurple)" stroke="rgba(255,255,255,0.1)" stroke-width="2"/>
+
+  <!-- Top shine -->
+  <path d="M70 8 L122 35 L122 70 L70 70 L18 70 L18 35 Z" fill="url(#shine5)" opacity="0.5"/>
+
+  <!-- D23AI Text -->
+  <text x="70" y="68" text-anchor="middle" font-family="system-ui, sans-serif" font-size="28" font-weight="900" letter-spacing="0" fill="white">D23AI</text>
+
+  <!-- Tagline -->
+  <text x="70" y="90" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" font-weight="500" letter-spacing="2" fill="rgba(255,255,255,0.6)">BHARAT'S AI</text>
+
+  <!-- Corner highlights -->
+  <circle cx="70" cy="16" r="3" fill="white" opacity="0.7"/>
+  <circle cx="116" cy="38" r="2" fill="white" opacity="0.5"/>
+  <circle cx="116" cy="102" r="2" fill="white" opacity="0.5"/>
+</svg>

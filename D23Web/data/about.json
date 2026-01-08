@@ -5,8 +5,8 @@
   },
   "mission": {
     "paragraphs": [
-      "We're building on a simple mission: everyone deserves a right to AI. D23.AI is built as the introduction and gateway to AI for Billions. While a majority of tech-literate folks in the US and across the world had their ChatGPT moment, in a country like India widespread adoption is yet to be seen.",
-      "We've made the first step towards this mission by launching D23.AI on WhatsApp for free. This is a voice-first offering, specializes in Indic languages supporting all major accents, and is abundantly accessible to every Indian on WhatsApp without the need for a new app or website. We're continuously adding features that make AI useful to Indians in their daily life, and also use-cases around Education, Healthcare and Creative. Join us on this exciting journey towards widespread adoption of AI."
+      "We're building on a simple mission: everyone deserves a right to AI. D23 AI is built as the introduction and gateway to AI for Billions. While a majority of tech-literate folks in the US and across the world had their ChatGPT moment, in a country like India widespread adoption is yet to be seen.",
+      "We've made the first step towards this mission by launching D23 AI on WhatsApp for free. This is a voice-first offering, specializes in Indic languages supporting all major accents, and is abundantly accessible to every Indian on WhatsApp without the need for a new app or website. We're continuously adding features that make AI useful to Indians in their daily life, and also use-cases around Education, Healthcare and Creative. Join us on this exciting journey towards widespread adoption of AI."
     ],
     "link": {
       "text": "d23.ai/hi",
@@ -32,7 +32,7 @@
   },
   "developers": {
     "title": "Our Development Team",
-    "subtitle": "The talented engineers building the technology behind D23.AI",
+    "subtitle": "The talented engineers building the technology behind D23 AI",
     "team": [
       {
         "name": "Manoj",

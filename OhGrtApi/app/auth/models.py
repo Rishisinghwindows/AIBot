@@ -9,8 +9,15 @@ from pydantic import BaseModel, Field
 class GoogleAuthRequest(BaseModel):
     """Request to exchange Firebase ID token for JWT."""
 
-    firebase_id_token: str = Field(..., description="Firebase ID token from client")
+    firebase_id_token: str = Field(None, description="Firebase ID token from client")
+    id_token: str = Field(None, description="Firebase ID token (alias)")
+
     device_info: Optional[str] = Field(None, description="Device identifier for token management")
+
+    @property
+    def token(self) -> str:
+        """Get the ID token from either field."""
+        return self.id_token or self.firebase_id_token or ""
 
 
 class RefreshTokenRequest(BaseModel):

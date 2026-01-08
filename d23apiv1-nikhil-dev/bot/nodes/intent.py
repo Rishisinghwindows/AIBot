@@ -25,7 +25,7 @@ class IntentClassification(BaseModel):
     """Structured output for intent classification."""
 
     intent: str = Field(
-        description="The classified intent: local_search, image, pnr_status, train_status, metro_ticket, weather, word_game, db_query, set_reminder, get_news, fact_check, get_horoscope, birth_chart, kundli_matching, ask_astrologer, numerology, tarot_reading, life_prediction, dosha_check, get_panchang, get_remedy, find_muhurta, or chat"
+        description="The classified intent: local_search, image, pnr_status, train_status, metro_ticket, weather, word_game, db_query, set_reminder, get_news, fact_check, get_horoscope, birth_chart, kundli_matching, ask_astrologer, numerology, tarot_reading, life_prediction, dosha_check, get_panchang, get_remedy, find_muhurta, help, or chat"
     )
     confidence: float = Field(description="Confidence score between 0 and 1")
     entities: dict = Field(
@@ -78,8 +78,10 @@ ASTROLOGY INTENTS (AstroTalk-like features):
 - tarot_reading: User wants a tarot card reading
   Examples: "tarot reading", "pick a tarot card", "tarot for love", "celtic cross spread"
 
-- chat: General conversation, greetings, questions, help, or anything that doesn't fit above
-  Examples: "hello", "what can you do", "tell me a joke", "who are you"
+- help: User asks what the bot can do, its features, capabilities, or needs assistance
+  Examples: "what can you do", "what are your features", "help me", "what services do you offer"
+- chat: General conversation, greetings, or anything that doesn't fit above
+  Examples: "hello", "tell me a joke", "who are you", "how are you"
 
 Extract relevant entities based on intent:
 - For pnr_status: Extract the 10-digit PNR number as "pnr"
@@ -193,6 +195,17 @@ async def detect_intent(state: BotState) -> dict:
                     "detected_language": detected_lang,
                     "error": None,
                 }
+            # Check if it's a food/restaurant location request
+            elif search_query == "__food__":
+                logger.info(f"Routing location message to food_order for pending food search")
+                return {
+                    "intent": "food_order",
+                    "intent_confidence": 1.0,
+                    "extracted_entities": {},
+                    "current_query": "restaurants near me",
+                    "detected_language": detected_lang,
+                    "error": None,
+                }
             else:
                 # Route to local_search to handle the pending search with location
                 logger.info(f"Routing location message to local_search for pending search")
@@ -219,10 +232,15 @@ async def detect_intent(state: BotState) -> dict:
     user_lower = user_message.lower()
 
     # Check for help/what can you do patterns first
-    help_keywords = ["what can you do", "what do you do", "what are your features",
-                     "what services", "how can you help", "what can i ask",
-                     "show me what you can do", "help me"]
+    help_keywords = [
+        "what can you do", "what do you do", "what are your features",
+        "what services", "how can you help", "what can i ask",
+        "show me what you can do", "help me", "what all can you do",
+        "your capabilities", "your features", "what you can do",
+        "what are you capable", "what all you can", "tell me what you can"
+    ]
     if any(kw in user_lower for kw in help_keywords):
+        logger.info(f"Help intent detected via keyword match: {user_message}")
         return {
             "intent": "help",
             "intent_confidence": 0.95,
@@ -328,7 +346,121 @@ async def detect_intent(state: BotState) -> dict:
             "detected_language": detected_lang,
             "error": None,
         }
-        
+
+    # IMPORTANT: Check for "near me" patterns EARLY - before other intent checks
+    # This ensures location-based queries are handled correctly
+    local_search_indicators = ["near me", "nearby", "nearest", "around me", "close to me", "near here"]
+    if any(ind in user_lower for ind in local_search_indicators):
+        # Extract search term by removing the indicator
+        search_term = user_lower
+        for ind in local_search_indicators:
+            search_term = search_term.replace(ind, "").strip()
+        # Remove common prefixes
+        for prefix in ["find", "search", "show", "get", "where is", "where are", "looking for", "i need", "i want"]:
+            if search_term.startswith(prefix):
+                search_term = search_term[len(prefix):].strip()
+
+        logger.info(f"Detected local_search with 'near me' indicator (early check), search_term: {search_term}")
+        return {
+            "intent": "local_search",
+            "intent_confidence": 0.95,
+            "extracted_entities": {
+                "search_query": search_term or user_message,
+                "location": "",  # Empty - will trigger location request
+            },
+            "current_query": user_message,
+            "detected_language": detected_lang,
+            "error": None,
+        }
+
+    # Check for food/restaurant patterns
+    food_keywords = [
+        "restaurant", "restaurants", "food", "order food", "hungry",
+        # Common misspellings
+        "restraunt", "restraunts", "resturant", "resturants", "restarant",
+        "restraurant", "restaurent", "restaurents", "restrant", "restrants",
+        "zomato", "swiggy", "food delivery", "eat", "dinner", "lunch",
+        "breakfast", "biryani", "pizza", "burger", "dosa", "idli",
+        "chinese food", "north indian", "south indian", "italian",
+        "thai food", "japanese", "korean", "cafe", "coffee shop",
+        "ice cream", "dessert", "bakery", "fast food", "street food",
+        "vegetarian restaurant", "non veg", "seafood",
+        # Hindi
+        "खाना", "रेस्टोरेंट", "रेस्तरां", "होटल", "भोजन", "खाना आर्डर",
+        "भूख", "भूखा", "खाना खाना", "बिरयानी", "पिज़्ज़ा", "बर्गर",
+        "डोसा", "इडली", "रोटी", "दाल", "सब्जी", "पनीर", "चिकन",
+        "मटन", "नाश्ता", "दोपहर का खाना", "रात का खाना", "चाय", "कॉफी",
+        "मिठाई", "आइसक्रीम", "समोसा", "पकौड़ा", "चाट", "पानी पूरी",
+        # Kannada
+        "ಊಟ", "ಹೋಟೆಲ್", "ರೆಸ್ಟೋರೆಂಟ್", "ಆಹಾರ", "ತಿನ್ನು", "ಹಸಿವು",
+        "ಬಿರಿಯಾನಿ", "ದೋಸೆ", "ಇಡ್ಲಿ", "ಚಪಾತಿ", "ರೊಟ್ಟಿ", "ಅನ್ನ",
+        "ಸಾಂಬಾರ್", "ರಸಂ", "ಪಲ್ಯ", "ಚಿಕನ್", "ಮಟನ್", "ಮೀನು",
+        "ತಿಂಡಿ", "ಕಾಫಿ", "ಚಹಾ", "ಸಿಹಿ", "ಐಸ್ ಕ್ರೀಮ್",
+        # Odia
+        "ଖାଇବା", "ହୋଟେଲ", "ରେଷ୍ଟୁରାଣ୍ଟ", "ଭୋଜନ", "ଖାଦ୍ୟ", "ଭୋକ",
+        "ବିରିୟାନି", "ଡୋସା", "ଇଡଲି", "ରୁଟି", "ଭାତ", "ଡାଲି", "ତରକାରୀ",
+        "ଚିକେନ", "ମଟନ", "ମାଛ", "ଜଳଖିଆ", "ଚା", "କଫି", "ମିଠା",
+        # Tamil
+        "உணவு", "உணவகம்", "ஹோட்டல்", "சாப்பாடு", "பசி", "தோசை",
+        "இட்லி", "பிரியாணி", "சாம்பார்", "ரசம்", "சிக்கன்", "மட்டன்",
+        # Telugu
+        "భోజనం", "హోటల్", "రెస్టారెంట్", "ఆకలి", "తిను", "బిర్యానీ",
+        "దోశ", "ఇడ్లీ", "చికెన్", "మటన్", "అన్నం", "సాంబార్",
+        # Bengali
+        "খাবার", "রেস্তোরাঁ", "হোটেল", "খিদে", "বিরিয়ানি", "ডোসা",
+        "ইডলি", "চিকেন", "মাটন", "মাছ", "ভাত", "ডাল", "মিষ্টি",
+        # Marathi
+        "जेवण", "हॉटेल", "रेस्टॉरंट", "भूक", "बिर्याणी", "डोसा",
+        "इडली", "चिकन", "मटण", "भात", "आमटी", "गोड",
+        # Restaurant detail queries - known restaurant names
+        "meghana foods", "truffles", "empire restaurant", "mtr ", "vidyarthi bhavan",
+        "bademiya", "cafe leopold", "swati snacks", "britannia",
+        "karim's", "paranthe wali", "bukhara", "haldiram",
+        "saravana bhavan", "murugan idli", "anjappar",
+        "paradise biryani", "bawarchi", "shah ghouse",
+        "dalma", "odisha hotel", "hare krishna", "truptee",
+        # Detail query patterns
+        "details of", "info about", "more about",
+    ]
+    if any(kw in user_lower for kw in food_keywords):
+        return {
+            "intent": "food_order",
+            "intent_confidence": 0.95,
+            "extracted_entities": {"query": user_message},
+            "current_query": user_message,
+            "detected_language": detected_lang,
+            "error": None,
+        }
+
+    # Check for events/tickets patterns (IPL, concerts, comedy shows)
+    events_keywords = [
+        # IPL/Cricket
+        "ipl", "ipl match", "cricket match", "cricket ticket",
+        "rcb match", "csk match", "mi match", "kkr match", "dc match",
+        "srh match", "rr match", "pbks match", "gt match", "lsg match",
+        "royal challengers", "chennai super kings", "mumbai indians",
+        "kolkata knight riders", "delhi capitals", "sunrisers",
+        "rajasthan royals", "punjab kings", "gujarat titans", "lucknow super giants",
+        # Concerts
+        "concert", "live show", "music show", "arijit singh", "coldplay", "ar rahman",
+        "diljit", "diljit dosanjh", "neha kakkar", "shreya ghoshal",
+        # Comedy
+        "comedy show", "standup", "stand-up comedy", "comedian",
+        "zakir khan", "biswa", "kenny sebastian", "anubhav bassi", "samay raina",
+        # General events
+        "book ticket", "event ticket", "upcoming events", "football match", "isl match",
+        "events in", "shows in", "matches in", "tickets for",
+    ]
+    if any(kw in user_lower for kw in events_keywords):
+        return {
+            "intent": "events",
+            "intent_confidence": 0.95,
+            "extracted_entities": {"query": user_message},
+            "current_query": user_message,
+            "detected_language": detected_lang,
+            "error": None,
+        }
+
     # Check for news patterns
     news_keywords = ["news", "headlines", "latest news", "breaking news"]
     if any(kw in user_lower for kw in news_keywords):
@@ -420,31 +552,8 @@ async def detect_intent(state: BotState) -> dict:
             "error": None,
         }
 
-    # Check for local search with "near me", "nearby" etc - route with empty location
-    # so handle_local_search will ask for user's location
-    local_search_indicators = ["near me", "nearby", "nearest", "around me", "close to me", "near here"]
-    if any(ind in user_lower for ind in local_search_indicators):
-        # Extract search term by removing the indicator
-        search_term = user_lower
-        for ind in local_search_indicators:
-            search_term = search_term.replace(ind, "").strip()
-        # Remove common prefixes
-        for prefix in ["find", "search", "show", "get", "where is", "where are", "looking for", "i need", "i want"]:
-            if search_term.startswith(prefix):
-                search_term = search_term[len(prefix):].strip()
-
-        logger.info(f"Detected local_search with 'near me' indicator, search_term: {search_term}")
-        return {
-            "intent": "local_search",
-            "intent_confidence": 0.95,
-            "extracted_entities": {
-                "search_query": search_term or user_message,
-                "location": "",  # Empty - will trigger location request
-            },
-            "current_query": user_message,
-            "detected_language": detected_lang,
-            "error": None,
-        }
+    # NOTE: "near me" check moved earlier in the file (before food/events checks)
+    # to ensure location-based queries are handled correctly
 
     # Check for astro patterns - more specific matching
     user_lower = user_message.lower()
@@ -1052,6 +1161,10 @@ async def detect_intent(state: BotState) -> dict:
             "get_panchang",
             "get_remedy",
             "find_muhurta",
+            # Events
+            "events",
+            # Food
+            "food_order",
             "help",
             "chat",
         ]

@@ -35,7 +35,7 @@ interface ChatMessage {
 export default function PublicPersonaPage() {
   const params = useParams();
   const handle = params.handle as string;
-  const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  const apiBase = "/api"; // Use Next.js proxy to avoid CORS
 
   const [persona, setPersona] = useState<Persona | null>(null);
   const [isLoading, setIsLoading] = useState(true);

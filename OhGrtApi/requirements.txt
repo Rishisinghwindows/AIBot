@@ -33,3 +33,5 @@ alembic
 
 # Scheduling
 croniter
+APScheduler>=3.10.0
+APScheduler>=3.10.0

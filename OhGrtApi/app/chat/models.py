@@ -42,6 +42,7 @@ class ChatSendResponse(BaseModel):
     conversation_id: UUID
     user_message: ChatMessageResponse
     assistant_message: ChatMessageResponse
+    requires_location: bool = False  # True if the response needs user location to continue
 
 
 class ToolInfo(BaseModel):

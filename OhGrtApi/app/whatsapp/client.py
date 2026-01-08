@@ -284,6 +284,51 @@ class WhatsAppClient:
             )
             return response.json()
 
+    async def send_typing_indicator(self, to: str, message_id: str, duration: float = 0) -> dict:
+        """
+        Send WhatsApp typing indicator (official Cloud API).
+
+        Shows "typing..." under bot name for up to 25 seconds
+        or until a reply is sent.
+
+        Args:
+            to: Recipient phone number
+            message_id: Message ID to respond to
+            duration: Optional delay in seconds to hold typing (default 0)
+
+        Returns:
+            API response dict
+        """
+        import asyncio
+
+        payload = {
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
+            "to": to,
+            "status": "read",
+            "message_id": message_id,
+            "typing_indicator": {
+                "type": "text"
+            }
+        }
+
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(
+                self.api_url,
+                headers=self._get_headers(),
+                json=payload,
+            )
+
+            result = response.json()
+            if response.status_code == 200:
+                logger.info("Typing indicator sent successfully")
+                if duration > 0:
+                    await asyncio.sleep(duration)
+            else:
+                logger.warning(f"Typing indicator error: {result}")
+
+            return result
+
     async def send_interactive_buttons(
         self,
         to: str,

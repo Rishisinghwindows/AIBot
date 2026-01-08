@@ -41,7 +41,7 @@ interface Document {
 export default function KnowledgeBasePage() {
   const { currentUser, loading, idToken, accessToken } = useAuth();
   const router = useRouter();
-  const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  const apiBase = "/api"; // Use Next.js proxy to avoid CORS
 
   const [documents, setDocuments] = useState<Document[]>([]);
   const [isUploading, setIsUploading] = useState(false);

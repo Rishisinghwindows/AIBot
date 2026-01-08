@@ -196,6 +196,71 @@ async def transcribe_audio(client: WhatsAppClient, media_id: str) -> Optional[st
         return None
 
 
+async def analyze_image(client: WhatsAppClient, media_id: str, caption: Optional[str] = None) -> Optional[str]:
+    """
+    Download and analyze WhatsApp image using Ollama vision model.
+
+    Args:
+        client: WhatsApp client instance
+        media_id: WhatsApp media ID
+        caption: Optional caption/question from user
+
+    Returns:
+        Image analysis result or None if failed
+    """
+    try:
+        from bot.services.vision_service import get_vision_service
+
+        # Get media URL from WhatsApp
+        media_url = await client.get_media_url(media_id)
+        if not media_url:
+            logger.error("Failed to get media URL for image analysis")
+            return None
+
+        # Download the image
+        image_bytes = await client.download_media(media_url)
+        if not image_bytes:
+            logger.error("Failed to download image for analysis")
+            return None
+
+        # Analyze using vision service
+        vision_service = get_vision_service()
+
+        # Determine analysis type based on caption
+        if caption:
+            caption_lower = caption.lower()
+            if any(kw in caption_lower for kw in ["text", "read", "ocr", "extract"]):
+                result = await vision_service.extract_text(image_bytes)
+            elif any(kw in caption_lower for kw in ["receipt", "bill", "invoice"]):
+                result = await vision_service.analyze_receipt(image_bytes)
+            elif any(kw in caption_lower for kw in ["food", "dish", "meal", "eat"]):
+                result = await vision_service.identify_food(image_bytes)
+            elif any(kw in caption_lower for kw in ["document", "paper", "form"]):
+                result = await vision_service.analyze_document(image_bytes)
+            elif any(kw in caption_lower for kw in ["object", "item", "thing", "list"]):
+                result = await vision_service.detect_objects(image_bytes)
+            else:
+                # Use caption as custom question
+                result = await vision_service.custom_query(image_bytes, caption)
+        else:
+            # Default: describe the image
+            result = await vision_service.describe_image(image_bytes)
+
+        if result:
+            logger.info(f"Image analyzed successfully: {result[:100]}...")
+            return result
+        else:
+            logger.warning("Image analysis returned empty result")
+            return None
+
+    except ImportError as e:
+        logger.warning(f"Vision service not available: {e}")
+        return None
+    except Exception as e:
+        logger.error(f"Image analysis failed: {e}", exc_info=True)
+        return None
+
+
 def detect_language(text: str) -> str:
     """
     Detect language of text for TTS voice selection.
@@ -240,8 +305,9 @@ async def process_and_respond(message: dict):
     from bot.graph import process_message
     client = get_whatsapp_client()
 
-    # Check if input was a voice message
+    # Check message type
     is_voice_input = message.get("message_type") == "audio"
+    is_image_input = message.get("message_type") == "image"
 
     try:
         # Mark message as read (shows double blue tick ✓✓)
@@ -256,6 +322,37 @@ async def process_and_respond(message: dict):
             else:
                 # Fallback message if transcription fails
                 message["text"] = "Voice message received but could not be transcribed"
+
+        # If image message, analyze it
+        if is_image_input and message.get("media_id"):
+            # Send typing indicator while processing image
+            await client.send_typing_indicator(
+                to=message["from_number"],
+                message_id=message["message_id"],
+                duration=25  # Image analysis takes longer
+            )
+
+            # Get caption if user sent one with the image
+            caption = message.get("caption")
+
+            # Analyze the image
+            analysis_result = await analyze_image(client, message["media_id"], caption)
+
+            if analysis_result:
+                # Send the analysis result directly
+                await client.send_text_message(
+                    to=message["from_number"],
+                    text=f"📷 *Image Analysis:*\n\n{analysis_result}",
+                    reply_to=message["message_id"],
+                )
+                logger.info(f"Image analysis sent to {message['from_number']}")
+            else:
+                await client.send_text_message(
+                    to=message["from_number"],
+                    text="Sorry, I couldn't analyze this image. Vision service is not available.",
+                    reply_to=message["message_id"],
+                )
+            return  # Image handled, no need for LangGraph
 
         # Send official typing indicator (shows "typing..." for 5 seconds)
         await client.send_typing_indicator(

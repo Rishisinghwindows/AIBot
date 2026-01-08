@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 140" fill="none">
+  <defs>
+    <!-- Neon pink gradient -->
+    <linearGradient id="neonPink" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FF006E"/>
+      <stop offset="100%" style="stop-color:#8338EC"/>
+    </linearGradient>
+
+    <!-- Glow filter -->
+    <filter id="neonGlow14" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect x="8" y="8" width="124" height="124" rx="30" fill="#0D0D0D"/>
+
+  <!-- Animated hexagon background -->
+  <polygon points="70,20 110,45 110,95 70,120 30,95 30,45" fill="none" stroke="#FF006E" stroke-width="1" opacity="0.2">
+    <animateTransform attributeName="transform" type="rotate" from="0 70 70" to="360 70 70" dur="20s" repeatCount="indefinite"/>
+  </polygon>
+  <polygon points="70,30 100,50 100,90 70,110 40,90 40,50" fill="none" stroke="#8338EC" stroke-width="1" opacity="0.15">
+    <animateTransform attributeName="transform" type="rotate" from="360 70 70" to="0 70 70" dur="15s" repeatCount="indefinite"/>
+  </polygon>
+
+  <!-- Pulsing circles -->
+  <circle cx="70" cy="70" r="50" fill="none" stroke="url(#neonPink)" stroke-width="1" opacity="0">
+    <animate attributeName="r" values="30;55;30" dur="2s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="0.5;0;0.5" dur="2s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="70" cy="70" r="40" fill="none" stroke="url(#neonPink)" stroke-width="1" opacity="0">
+    <animate attributeName="r" values="25;50;25" dur="2s" repeatCount="indefinite" begin="0.5s"/>
+    <animate attributeName="opacity" values="0.3;0;0.3" dur="2s" repeatCount="indefinite" begin="0.5s"/>
+  </circle>
+
+  <!-- D23AI with neon glow -->
+  <text x="70" y="65" text-anchor="middle" font-family="system-ui, sans-serif" font-size="30" font-weight="900" letter-spacing="-1" fill="url(#neonPink)" filter="url(#neonGlow14)">D23AI</text>
+
+  <!-- Subtitle with typing effect simulation -->
+  <text x="70" y="90" text-anchor="middle" font-family="monospace" font-size="10" fill="#FF006E" opacity="0.8">
+    <tspan>POWERED BY AI</tspan>
+    <animate attributeName="opacity" values="0.8;0.4;0.8" dur="1s" repeatCount="indefinite"/>
+  </text>
+
+  <!-- Corner decorations -->
+  <path d="M20 40 L20 20 L40 20" fill="none" stroke="url(#neonPink)" stroke-width="2" filter="url(#neonGlow14)">
+    <animate attributeName="stroke-dasharray" values="0,100;100,0" dur="2s" repeatCount="indefinite"/>
+  </path>
+  <path d="M120 40 L120 20 L100 20" fill="none" stroke="url(#neonPink)" stroke-width="2" filter="url(#neonGlow14)">
+    <animate attributeName="stroke-dasharray" values="0,100;100,0" dur="2s" repeatCount="indefinite" begin="0.5s"/>
+  </path>
+  <path d="M20 100 L20 120 L40 120" fill="none" stroke="url(#neonPink)" stroke-width="2" filter="url(#neonGlow14)">
+    <animate attributeName="stroke-dasharray" values="0,100;100,0" dur="2s" repeatCount="indefinite" begin="1s"/>
+  </path>
+  <path d="M120 100 L120 120 L100 120" fill="none" stroke="url(#neonPink)" stroke-width="2" filter="url(#neonGlow14)">
+    <animate attributeName="stroke-dasharray" values="0,100;100,0" dur="2s" repeatCount="indefinite" begin="1.5s"/>
+  </path>
+
+  <!-- Energy dots -->
+  <circle cx="70" cy="25" r="3" fill="#FF006E" filter="url(#neonGlow14)">
+    <animate attributeName="opacity" values="1;0.3;1" dur="0.8s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="70" cy="115" r="3" fill="#8338EC" filter="url(#neonGlow14)">
+    <animate attributeName="opacity" values="0.3;1;0.3" dur="0.8s" repeatCount="indefinite"/>
+  </circle>
+</svg>

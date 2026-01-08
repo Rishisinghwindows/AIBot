@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 140" fill="none">
+  <defs>
+    <!-- Aurora gradient -->
+    <linearGradient id="auroraGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#22D3EE"/>
+      <stop offset="30%" style="stop-color:#A78BFA"/>
+      <stop offset="60%" style="stop-color:#F472B6"/>
+      <stop offset="100%" style="stop-color:#FB923C"/>
+    </linearGradient>
+
+    <radialGradient id="centerGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:rgba(255,255,255,0.2)"/>
+      <stop offset="100%" style="stop-color:transparent"/>
+    </radialGradient>
+
+    <filter id="blur4">
+      <feGaussianBlur stdDeviation="2"/>
+    </filter>
+  </defs>
+
+  <!-- Circle background -->
+  <circle cx="70" cy="70" r="62" fill="url(#auroraGrad)"/>
+
+  <!-- Inner circle -->
+  <circle cx="70" cy="70" r="55" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="1"/>
+
+  <!-- Center glow -->
+  <circle cx="70" cy="70" r="50" fill="url(#centerGlow)"/>
+
+  <!-- D23AI stacked -->
+  <text x="70" y="65" text-anchor="middle" font-family="system-ui, sans-serif" font-size="34" font-weight="900" letter-spacing="-1" fill="white">D23</text>
+  <text x="70" y="95" text-anchor="middle" font-family="system-ui, sans-serif" font-size="22" font-weight="700" letter-spacing="6" fill="rgba(255,255,255,0.85)">AI</text>
+
+  <!-- Orbit ring -->
+  <ellipse cx="70" cy="70" rx="58" ry="20" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1" transform="rotate(-20 70 70)"/>
+
+  <!-- Orbiting dot -->
+  <circle r="4" fill="white">
+    <animateMotion dur="4s" repeatCount="indefinite">
+      <mpath href="#orbitPath"/>
+    </animateMotion>
+  </circle>
+  <path id="orbitPath" d="M 12 70 A 58 20 -20 1 1 128 70 A 58 20 -20 1 1 12 70" fill="none"/>
+</svg>

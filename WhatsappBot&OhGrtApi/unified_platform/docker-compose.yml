@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  # WhatsApp Bot
+  whatsapp-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile.bot
+    ports:
+      - "9002:9002"
+    environment:
+      - ENVIRONMENT=production
+      - LITE_MODE=false
+    env_file:
+      - .env
+    depends_on:
+      - postgres
+      - redis
+    restart: unless-stopped
+
+  # OhGrt API
+  ohgrt-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    ports:
+      - "9003:9002"
+    environment:
+      - ENVIRONMENT=production
+    env_file:
+      - .env
+    depends_on:
+      - postgres
+      - redis
+    restart: unless-stopped
+
+  # PostgreSQL
+  postgres:
+    image: pgvector/pgvector:pg16
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  # Redis
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:

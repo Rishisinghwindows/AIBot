@@ -1,7 +1,6 @@
 import type React from "react"
 import type { Metadata } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
-import { Analytics } from "@vercel/analytics/next"
 import { AuthProvider } from "@/context/AuthContext"
 import "./globals.css"
 
@@ -14,7 +13,7 @@ export const metadata: Metadata = {
   generator: "d23.ai",
   metadataBase: new URL("https://d23ai.in"),
   icons: {
-    icon: "/d23-logo.png",
+    icon: "/d23ai-logo-v7.svg",
     apple: "/apple-icon.png",
   },
   openGraph: {
@@ -52,7 +51,6 @@ export default function RootLayout({
         <AuthProvider>
           {children}
         </AuthProvider>
-        <Analytics />
       </body>
     </html>
   )
