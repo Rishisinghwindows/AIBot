@@ -8,13 +8,14 @@ const cspDirectives = {
   'default-src': ["'self'"],
   'script-src': [
     "'self'",
-    // Only allow unsafe-inline and unsafe-eval in development
-    ...(isDev ? ["'unsafe-inline'", "'unsafe-eval'"] : []),
+    "'unsafe-inline'", // Required for Next.js hydration scripts
+    ...(isDev ? ["'unsafe-eval'"] : []), // unsafe-eval only in development
     "https://va.vercel-scripts.com", // Vercel Analytics
     "https://vercel.live", // Vercel Live
     "https://apis.google.com", // Google Sign-In
     "https://www.gstatic.com", // Google scripts
     "https://accounts.google.com", // Google accounts
+    "https://www.googletagmanager.com", // Google Tag Manager / Analytics
   ],
   'style-src': ["'self'", "'unsafe-inline'"], // inline styles for Tailwind (required)
   // SECURITY: Restrict img-src to specific trusted domains instead of all https
@@ -26,11 +27,14 @@ const cspDirectives = {
     "https://firebasestorage.googleapis.com", // Firebase storage
     "https://www.gstatic.com", // Google static assets
     "https://*.fal.media", // fal.ai generated images
+    "https://www.googletagmanager.com", // Google Analytics tracking pixels
   ],
   'font-src': ["'self'", "data:"],
   'connect-src': [
     "'self'",
     "http://localhost:*", // Local API for dev
+    "http://192.168.1.100:*", // LAN IP for dev
+    "http://122.166.148.116:*", // External IP for dev
     "https://api.whatsapp.com",
     "https://accounts.google.com",
     "https://oauth2.googleapis.com",
@@ -41,6 +45,9 @@ const cspDirectives = {
     "https://securetoken.googleapis.com", // Firebase tokens
     "https://vitals.vercel-insights.com", // Vercel Analytics
     "https://va.vercel-scripts.com", // Vercel Analytics
+    "https://www.google-analytics.com", // Google Analytics
+    "https://*.google-analytics.com", // Google Analytics
+    "https://*.analytics.google.com", // Google Analytics
     "ws://localhost:*", // WebSocket for dev
     "wss://localhost:*",
   ],
@@ -93,12 +100,19 @@ const nextConfig = {
     ],
   },
 
-  // Proxy API requests to backend (allows external access without exposing backend port)
+  // Proxy API requests to backend
+  // Uses API_URL env variable, or defaults based on environment
   async rewrites() {
+    // Allow override via environment variable
+    const apiUrl = process.env.API_URL
+      || (process.env.NODE_ENV === 'production'
+        ? 'http://localhost:9002'  // OhGrtApi backend
+        : 'http://localhost:9002')
+
     return [
       {
         source: '/api/:path*',
-        destination: 'http://localhost:9002/:path*',
+        destination: `${apiUrl}/:path*`,
       },
     ]
   },

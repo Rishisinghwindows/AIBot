@@ -115,6 +115,9 @@ class BotState(TypedDict):
     user_birth_details: Optional[dict]
     user_language: Optional[str]
 
+    # Detected language from current message (for response localization)
+    detected_language: Optional[str]
+
     # Conversation context
     conversation_context: Optional[dict]
 
@@ -171,6 +174,7 @@ def create_initial_state(
         user_id=user_id,
         user_birth_details=user_birth_details,
         user_language=user_language or "en",
+        detected_language="en",  # Will be updated by intent detection
         conversation_context=None,
         tool_result=None,
         word_game={"is_active": False, "correct_word": None},

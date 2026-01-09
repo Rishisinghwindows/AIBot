@@ -4,7 +4,9 @@ import { useState, useCallback, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { ChatMessage } from "@/lib/api-client";
 import { User, Bot, Copy, Check, ThumbsUp, ThumbsDown, RefreshCw } from "lucide-react";
-import { PNRCard, WeatherCard, HoroscopeCard, TarotCard, NewsCard, NumerologyCard } from "./cards";
+import { PNRCard, WeatherCard, HoroscopeCard, TarotCard, NewsCard, NumerologyCard, EmailListCard } from "./cards";
+import { EmailComposeCard } from "./EmailComposeCard";
+import authFetch from "@/lib/auth_fetch";
 import {
   Tooltip,
   TooltipContent,
@@ -54,11 +56,86 @@ export function MessageBubble({
   }, [message.id, onFeedback]);
 
   // Check if we should render a rich card
-  const shouldRenderCard = !isUser && message.intent && message.structured_data;
+  const hasEmailCompose = !isUser && message.structured_data && (message.structured_data as any).type === "email_compose";
+  const hasEmailList = !isUser && message.structured_data && (message.structured_data as any).type === "email_list";
+  const shouldRenderCard = !isUser && (message.intent || hasEmailCompose || hasEmailList) && message.structured_data;
+
+  // Handle sending email
+  const handleSendEmail = async (data: { to: string; subject: string; body: string; cc?: string; bcc?: string }) => {
+    const apiBase = "/api"; // Use Next.js proxy to avoid CORS
+    const token = localStorage.getItem("access_token");
+
+    if (!token) {
+      throw new Error("Please log in to send emails");
+    }
+
+    const response = await authFetch(`${apiBase}/chat/email/send`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }, token);
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Failed to send email");
+    }
+
+    const result = await response.json();
+    if (!result.success) {
+      throw new Error(result.error || "Failed to send email");
+    }
+  };
+
+  // Handle scheduling email
+  const handleScheduleEmail = async (data: { to: string; subject: string; body: string; cc?: string; bcc?: string; scheduled_at: string; timezone: string }) => {
+    const apiBase = "/api"; // Use Next.js proxy to avoid CORS
+    const token = localStorage.getItem("access_token");
+
+    if (!token) {
+      throw new Error("Please log in to schedule emails");
+    }
+
+    const response = await authFetch(`${apiBase}/chat/email/schedule`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }, token);
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Failed to schedule email");
+    }
+
+    const result = await response.json();
+    if (!result.success) {
+      throw new Error(result.error || "Failed to schedule email");
+    }
+  };
 
   // Render the appropriate card based on intent
   const renderRichCard = () => {
     if (!message.structured_data) return null;
+
+    // Check for special types in structured_data
+    const data = message.structured_data as any;
+
+    if (data.type === "email_compose") {
+      return (
+        <EmailComposeCard
+          initialData={{
+            to: data.to || "",
+            subject: data.subject || "",
+            body: data.body || "",
+            cc: data.cc,
+            bcc: data.bcc,
+          }}
+          onSend={handleSendEmail}
+          onSchedule={handleScheduleEmail}
+        />
+      );
+    }
+
+    if (data.type === "email_list") {
+      return <EmailListCard data={data} />;
+    }
 
     switch (message.intent) {
       case "pnr_status":
@@ -118,8 +195,8 @@ export function MessageBubble({
           </div>
         )}
 
-        {/* Text Message (only show if no rich card - cards contain all the info) */}
-        {!richCard && (
+        {/* Text Message - show if no rich card and there's content */}
+        {!richCard && message.content?.trim() && (
           <div
             className={cn(
               "rounded-2xl px-4 py-2.5 text-sm leading-relaxed",
@@ -155,6 +232,13 @@ export function MessageBubble({
                 )}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Fallback for completely empty messages */}
+        {!richCard && !message.content?.trim() && !isUser && (
+          <div className="rounded-2xl px-4 py-2.5 text-sm leading-relaxed bg-muted text-muted-foreground rounded-tl-sm">
+            <span className="italic">Unable to process this request.</span>
           </div>
         )}
 

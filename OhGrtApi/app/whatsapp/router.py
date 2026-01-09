@@ -230,28 +230,18 @@ async def process_and_respond(message: dict):
                 # Fallback message if transcription fails
                 message["text"] = "Voice message received but could not be transcribed"
 
-        # Send typing indicator (react with hourglass)
+        # Send official typing indicator (shows "typing..." under bot name)
         try:
-            await client.send_reaction(
+            typing_result = await client.send_typing_indicator(
                 to=message["from_number"],
                 message_id=message["message_id"],
-                emoji="⏳",
             )
+            logger.info(f"Typing indicator sent: {typing_result}")
         except Exception as e:
-            logger.warning(f"Failed to send typing reaction: {e}")
+            logger.warning(f"Failed to send typing indicator: {e}")
 
         # Process through LangGraph workflow
         result = await process_whatsapp_message(message)
-
-        # Remove typing indicator
-        try:
-            await client.send_reaction(
-                to=message["from_number"],
-                message_id=message["message_id"],
-                emoji="",  # Empty emoji removes reaction
-            )
-        except Exception as e:
-            logger.warning(f"Failed to remove typing reaction: {e}")
 
         response_text = result.get("response_text", "")
         response_type = result.get("response_type", "text")

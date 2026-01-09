@@ -50,7 +50,20 @@
       "Bash(xargs kill -9 sleep 2 lsof -ti:9002)",
       "Bash(git checkout:*)",
       "Bash(brew install:*)",
-      "Bash(source:*)"
+      "Bash(source:*)",
+      "WebFetch(domain:www.analyticsvidhya.com)",
+      "WebFetch(domain:medium.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:apify.com)",
+      "Bash(diff:*)",
+      "Bash(readlink:*)",
+      "Bash(head:*)",
+      "Bash(ollama list:*)",
+      "Bash(ollama pull:*)",
+      "Bash(ollama run:*)",
+      "Bash(pip show:*)",
+      "Bash(/Users/rishi/Desktop/WorkSpace/AIBot/d23apiv1-nikhil-dev/venv/bin/pip install:*)",
+      "Bash(/Users/rishi/Desktop/WorkSpace/AIBot/d23apiv1-nikhil-dev/venv/bin/python3:*)"
     ]
   }
 }

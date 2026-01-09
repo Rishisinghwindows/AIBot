@@ -41,6 +41,7 @@ from app.graph.nodes.astro_node import (
     handle_ask_astrologer,
 )
 from app.graph.nodes.schedule_node import handle_schedule
+from app.graph.nodes.help_node import handle_help
 
 
 def route_by_intent(state: BotState) -> str:

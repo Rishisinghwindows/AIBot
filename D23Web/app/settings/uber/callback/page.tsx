@@ -1,16 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import authFetch from "@/lib/auth_fetch";
 import { Loader2, CheckCircle2, XCircle } from "lucide-react";
 
 type Status = "pending" | "success" | "error";
 
-export default function UberCallbackPage() {
+function UberCallbackContent() {
   const params = useSearchParams();
   const router = useRouter();
-  const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  const apiBase = "/api";
   const [status, setStatus] = useState<Status>("pending");
   const [message, setMessage] = useState("Completing Uber connection...");
 
@@ -25,7 +25,7 @@ export default function UberCallbackPage() {
 
     const completeConnection = async () => {
       try {
-        const response = await authFetch(`${apiBase}/uber/exchange`, {
+        const response = await authFetch(`${apiBase}/auth/providers/uber/exchange`, {
           method: "POST",
           body: JSON.stringify({ code, state }),
         });
@@ -75,5 +75,25 @@ export default function UberCallbackPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function UberCallbackPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-black px-4">
+          <div className="max-w-md w-full bg-zinc-900 border border-zinc-800 rounded-xl p-8">
+            <div className="flex flex-col items-center gap-4">
+              <Loader2 className="h-12 w-12 animate-spin text-violet-500" />
+              <h2 className="text-xl font-semibold text-white">Uber Authorization</h2>
+              <p className="text-sm text-zinc-400 text-center">Loading...</p>
+            </div>
+          </div>
+        </div>
+      }
+    >
+      <UberCallbackContent />
+    </Suspense>
   );
 }

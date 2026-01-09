@@ -21,6 +21,29 @@ from app.utils.llm import build_chat_llm
 from app.utils.models import AgentState, RouterCategory
 
 
+HELP_RESPONSE = """I can help you with a variety of tasks tailored for Indian users! Here's what I can do for you:
+
+• 🎫 *Events & Tickets*: Find IPL matches, concerts, comedy shows, and book tickets.
+• 🏏 *IPL Matches*: Get upcoming IPL matches, team schedules (RCB, CSK, MI, etc.).
+• 🎵 *Concerts*: Find live music shows and concerts near you.
+• 😂 *Comedy Shows*: Discover standup comedy events.
+• 🍽️ *Food & Restaurants*: Find restaurants by city and cuisine, popular dishes and ratings.
+• 🚆 *Train Info*: Check live train status, PNR status, schedules, or trains between stations.
+• 🔍 *Web Search*: Get the latest news, facts, or info not in my training data.
+• 📝 *Fact-Checking*: Verify the truthfulness of any text or claim.
+• 📅 *Reminders*: Set reminders for tasks, meetings, or events.
+• 📍 *Nearby Places*: Find ATMs, hospitals, petrol pumps, or landmarks near you.
+• 🖼️ *Media Creation*: Generate images, videos, or stickers based on your description.
+• 📰 *Read Webpages*: Extract content from specific URLs.
+• 🌤️ *Weather*: Get current weather and forecasts for any city.
+• 🔮 *Astrology*: Daily horoscope, Kundli, compatibility matching, and predictions.
+• ❓ *General Help*: Answer questions, explain concepts, or guide you through anything else!
+
+Just let me know what you need — whether it's finding a restaurant, checking train timings, or even creating a fun sticker! 😊
+
+Need help with something specific? Just ask!"""
+
+
 class GraphBuilder:
     def __init__(self, settings: Settings):
         self.settings = settings
@@ -80,6 +103,9 @@ class GraphBuilder:
     async def chat_node(self, state: AgentState) -> Dict[str, Any]:
         return {"response": await self._make_chat_response(state["message"])}
 
+    async def help_node(self, state: AgentState) -> Dict[str, Any]:
+        return {"response": HELP_RESPONSE}
+
     def route_after_router(self, state: AgentState) -> str:
         category = state.get("category", RouterCategory.chat.value)
         return category
@@ -92,6 +118,7 @@ class GraphBuilder:
         graph.add_node("sql", self.sql_node)
         graph.add_node("gmail", self.gmail_node)
         graph.add_node("image", self.image_node)
+        graph.add_node("help", self.help_node)
         graph.add_node("chat", self.chat_node)
 
         graph.add_edge(START, "router")
@@ -104,6 +131,7 @@ class GraphBuilder:
                 RouterCategory.sql.value: "sql",
                 RouterCategory.gmail.value: "gmail",
                 RouterCategory.image.value: "image",
+                RouterCategory.help.value: "help",
                 RouterCategory.chat.value: "chat",
             },
         )
@@ -112,6 +140,7 @@ class GraphBuilder:
         graph.add_edge("sql", END)
         graph.add_edge("gmail", END)
         graph.add_edge("image", END)
+        graph.add_edge("help", END)
         graph.add_edge("chat", END)
 
         logger.info(f"langgraph_initialized: nodes={list(graph.nodes.keys())}")

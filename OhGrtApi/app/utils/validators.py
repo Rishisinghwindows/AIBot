@@ -8,6 +8,8 @@ import re
 from datetime import datetime, date
 from typing import Optional, Tuple
 
+from app.i18n.constants import RASHI_TO_ENGLISH, ZODIAC_SIGNS
+
 
 class ValidationError(Exception):
     """Raised when validation fails."""
@@ -168,14 +170,14 @@ def validate_time_string(
 
 def validate_zodiac_sign(sign: str, field_name: str = "zodiac_sign") -> str:
     """
-    Validate a zodiac sign.
+    Validate a zodiac sign (supports English and Indian languages).
 
     Args:
-        sign: Zodiac sign to validate
+        sign: Zodiac sign to validate (English, Hindi, or transliterated)
         field_name: Name of the field for error messages
 
     Returns:
-        Normalized zodiac sign (capitalized)
+        Normalized zodiac sign (capitalized English name)
 
     Raises:
         ValidationError: If validation fails
@@ -188,15 +190,31 @@ def validate_zodiac_sign(sign: str, field_name: str = "zodiac_sign") -> str:
     if not sign:
         raise ValidationError(f"{field_name} is required", field_name)
 
-    sign_lower = sign.strip().lower()
+    sign_stripped = sign.strip()
+    sign_lower = sign_stripped.lower()
 
-    if sign_lower not in valid_signs:
-        raise ValidationError(
-            f"Invalid zodiac sign. Must be one of: {', '.join(s.capitalize() for s in valid_signs)}",
-            field_name
-        )
+    # First check if it's already a valid English sign
+    if sign_lower in valid_signs:
+        return sign_lower.capitalize()
 
-    return sign_lower.capitalize()
+    # Check for Hindi/transliterated names using RASHI_TO_ENGLISH mapping
+    if sign_stripped in RASHI_TO_ENGLISH:
+        return RASHI_TO_ENGLISH[sign_stripped].capitalize()
+
+    # Also check lowercase version for transliterated names
+    if sign_lower in RASHI_TO_ENGLISH:
+        return RASHI_TO_ENGLISH[sign_lower].capitalize()
+
+    # Check against all zodiac signs in all languages from ZODIAC_SIGNS
+    for english_sign, translations in ZODIAC_SIGNS.items():
+        for lang, name in translations.items():
+            if name.lower() == sign_lower or name == sign_stripped:
+                return english_sign.capitalize()
+
+    raise ValidationError(
+        f"Invalid zodiac sign. Must be one of: {', '.join(s.capitalize() for s in valid_signs)}",
+        field_name
+    )
 
 
 def validate_pnr(pnr: str, field_name: str = "PNR") -> str:

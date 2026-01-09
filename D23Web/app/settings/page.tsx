@@ -50,6 +50,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { mcpTemplates, MCPTemplate } from "@/lib/mcp-templates";
 import { Tool } from "@/lib/types";
+import { ScheduledEmailsList } from "@/components/settings/ScheduledEmailsList";
 
 const iconMap: Record<string, React.ReactNode> = {
   Mail: <Mail className="h-5 w-5" />,
@@ -76,7 +77,8 @@ type ProviderStatus = {
 export default function SettingsPage() {
   const { currentUser, loading, idToken, accessToken } = useAuth();
   const router = useRouter();
-  const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  // Use Next.js proxy to avoid CORS issues - requests to /api/* are proxied to backend
+  const apiBase = "/api";
   const [tools, setTools] = useState<Tool[]>([]);
   const [isLoadingTools, setIsLoadingTools] = useState(true);
   const [selectedTemplate, setSelectedTemplate] = useState<MCPTemplate | null>(null);
@@ -92,33 +94,37 @@ export default function SettingsPage() {
     }
   }, [currentUser, loading, router]);
 
-  const fetchProviderStatus = async (provider: string) => {
+  const fetchAllProviderStatuses = async () => {
     if (!accessToken) {
-      console.log(`[OAuth] No accessToken available for ${provider} status check`);
-      console.log(`[OAuth] idToken available: ${!!idToken}`);
-      console.log(`[OAuth] localStorage access_token: ${!!localStorage.getItem("access_token")}`);
+      console.log(`[OAuth] No accessToken available for provider status check`);
       return;
     }
-    console.log(`[OAuth] Fetching ${provider} status with accessToken`);
-    setLoadingProviders(prev => ({ ...prev, [provider]: true }));
+    console.log(`[OAuth] Fetching all provider statuses`);
+    setLoadingProviders({ gmail: true, github: true, slack: true, jira: true, uber: true });
     try {
-      const response = await authFetch(`${apiBase}/${provider}/status`, {}, accessToken);
-      console.log(`[OAuth] ${provider} status response:`, response.status);
+      const response = await authFetch(`${apiBase}/auth/providers`, {}, accessToken);
+      console.log(`[OAuth] providers response:`, response.status);
       if (response.ok) {
-        const data = await response.json();
-        console.log(`[OAuth] ${provider} status data:`, data);
-        setProviderStatuses(prev => ({ ...prev, [provider]: data }));
+        const providers = await response.json();
+        console.log(`[OAuth] providers data:`, providers);
+        const statuses: Record<string, ProviderStatus> = {};
+        for (const provider of providers) {
+          statuses[provider.name] = { connected: provider.connected };
+        }
+        setProviderStatuses(statuses);
       } else {
-        const errorText = await response.text();
-        console.error(`[OAuth] ${provider} status error:`, response.status, errorText);
-        setProviderStatuses(prev => ({ ...prev, [provider]: { connected: false } }));
+        console.error(`[OAuth] providers error:`, response.status);
       }
     } catch (error) {
-      console.error(`[OAuth] Error fetching ${provider} status:`, error);
-      setProviderStatuses(prev => ({ ...prev, [provider]: { connected: false } }));
+      console.error(`[OAuth] Error fetching providers:`, error);
     } finally {
-      setLoadingProviders(prev => ({ ...prev, [provider]: false }));
+      setLoadingProviders({});
     }
+  };
+
+  // Keep single provider fetch for refresh after OAuth callback
+  const fetchProviderStatus = async (provider: string) => {
+    await fetchAllProviderStatuses();
   };
 
   const fetchTools = async () => {
@@ -142,8 +148,8 @@ export default function SettingsPage() {
   useEffect(() => {
     if (currentUser && accessToken) {
       fetchTools();
-      // Fetch status for OAuth providers
-      ['gmail', 'jira', 'github', 'slack', 'uber'].forEach(fetchProviderStatus);
+      // Fetch status for all OAuth providers at once
+      fetchAllProviderStatuses();
     }
   }, [currentUser, accessToken, idToken]);
 
@@ -218,24 +224,24 @@ export default function SettingsPage() {
 
     setIsSaving(true);
     try {
-      console.log(`[OAuth] Calling ${apiBase}/${provider}/oauth-url`);
-      const response = await authFetch(`${apiBase}/${provider}/oauth-url`, {}, accessToken);
-      console.log(`[OAuth] ${provider} oauth-url response:`, response.status);
+      console.log(`[OAuth] Calling ${apiBase}/auth/providers/${provider}/start`);
+      const response = await authFetch(`${apiBase}/auth/providers/${provider}/start`, {}, accessToken);
+      console.log(`[OAuth] ${provider} oauth start response:`, response.status);
 
       if (!response.ok) {
         let detail = `Failed to start ${provider} OAuth`;
         try {
           const error = await response.json();
-          console.error(`[OAuth] ${provider} oauth-url error:`, error);
+          console.error(`[OAuth] ${provider} oauth start error:`, error);
           detail = error.detail || detail;
         } catch {
           const text = await response.text();
-          console.error(`[OAuth] ${provider} oauth-url raw error:`, text);
+          console.error(`[OAuth] ${provider} oauth start raw error:`, text);
         }
         throw new Error(detail);
       }
       const data = await response.json();
-      console.log(`[OAuth] ${provider} oauth-url success:`, data);
+      console.log(`[OAuth] ${provider} oauth start success:`, data);
       if (data.auth_url) {
         window.location.href = data.auth_url;
       } else {
@@ -244,6 +250,36 @@ export default function SettingsPage() {
     } catch (error) {
       console.error(`[OAuth] Error starting ${provider} OAuth:`, error);
       alert((error as Error).message || `Failed to start ${provider} OAuth`);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDisconnectProvider = async (provider: string) => {
+    if (!accessToken) return;
+
+    setIsSaving(true);
+    try {
+      const response = await authFetch(
+        `${apiBase}/auth/providers/${provider}`,
+        { method: "DELETE" },
+        accessToken
+      );
+
+      if (response.ok) {
+        // Update local state
+        setProviderStatuses((prev) => ({
+          ...prev,
+          [provider]: { connected: false },
+        }));
+        setSelectedTemplate(null);
+      } else {
+        const error = await response.json();
+        alert(error.detail || `Failed to disconnect ${provider}`);
+      }
+    } catch (error) {
+      console.error(`Error disconnecting ${provider}:`, error);
+      alert(`Failed to disconnect ${provider}`);
     } finally {
       setIsSaving(false);
     }
@@ -435,17 +471,20 @@ export default function SettingsPage() {
                   {categoryTemplates.map((template) => {
                     const isConfigured = isIntegrationConfigured(template.id);
                     const isComingSoon = template.comingSoon;
+                    const isOAuth = isOAuthProvider(template.id);
+                    // Allow clicking connected OAuth providers to manage them
+                    const canClick = !isComingSoon && (!isConfigured || isOAuth);
                     return (
                       <div
                         key={template.id}
                         className={`rounded-xl border border-zinc-800 bg-zinc-900/50 backdrop-blur-sm p-4 transition-all ${
                           isComingSoon
                             ? "opacity-70 cursor-default"
-                            : isConfigured
+                            : isConfigured && !isOAuth
                             ? "opacity-60 cursor-default"
                             : "cursor-pointer hover:border-violet-500/50 hover:shadow-lg hover:shadow-violet-500/5"
                         }`}
-                        onClick={() => !isConfigured && !isComingSoon && handleAddIntegration(template)}
+                        onClick={() => canClick && handleAddIntegration(template)}
                       >
                         <div className="flex items-start justify-between mb-3">
                           <div className="flex items-center gap-3">
@@ -476,6 +515,19 @@ export default function SettingsPage() {
               </div>
             );
           })}
+        </section>
+
+        {/* Scheduled Emails Section */}
+        <section className="mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-zinc-200 flex items-center gap-2">
+              <Clock className="h-5 w-5 text-blue-400" />
+              Scheduled Emails
+            </h2>
+          </div>
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900/30 p-4">
+            <ScheduledEmailsList accessToken={accessToken} />
+          </div>
         </section>
       </main>
 
@@ -592,7 +644,7 @@ export default function SettingsPage() {
             </div>
           )}
 
-          <DialogFooter>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
             <Button
               variant="outline"
               onClick={() => setSelectedTemplate(null)}
@@ -601,16 +653,53 @@ export default function SettingsPage() {
               Cancel
             </Button>
             {selectedTemplate && isOAuthProvider(selectedTemplate.id) ? (
-              <Button
-                onClick={() => handleStartOAuthConnect(selectedTemplate.id)}
-                disabled={isSaving || loadingProviders[selectedTemplate.id]}
-                className="bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white"
-              >
-                {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                {providerStatuses[selectedTemplate.id]?.connected
-                  ? `Reconnect ${selectedTemplate.name}`
-                  : `Connect ${selectedTemplate.name}`}
-              </Button>
+              <div className="flex gap-2">
+                {providerStatuses[selectedTemplate.id]?.connected && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="outline"
+                        disabled={isSaving}
+                        className="border-red-500/50 bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:text-red-300"
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Disconnect
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent className="bg-zinc-900 border-zinc-800">
+                      <AlertDialogHeader>
+                        <AlertDialogTitle className="text-white">
+                          Disconnect {selectedTemplate.name}?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription className="text-zinc-400">
+                          This will remove your {selectedTemplate.name} connection. You can reconnect anytime.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel className="bg-zinc-800 border-zinc-700 text-white hover:bg-zinc-700">
+                          Cancel
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => handleDisconnectProvider(selectedTemplate.id)}
+                          className="bg-red-600 hover:bg-red-700 text-white"
+                        >
+                          Disconnect
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
+                <Button
+                  onClick={() => handleStartOAuthConnect(selectedTemplate.id)}
+                  disabled={isSaving || loadingProviders[selectedTemplate.id]}
+                  className="bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white"
+                >
+                  {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                  {providerStatuses[selectedTemplate.id]?.connected
+                    ? `Reconnect`
+                    : `Connect ${selectedTemplate.name}`}
+                </Button>
+              </div>
             ) : (
               <div className="flex flex-col items-end gap-1">
                 {missingRequiredFields.length > 0 && (

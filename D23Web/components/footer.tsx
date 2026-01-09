@@ -23,7 +23,7 @@ export function Footer() {
       <div className="mx-auto max-w-6xl space-y-6 px-4 py-12">
         <div className="flex flex-col items-start gap-6 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-3">
-            <Image src="/d23-logo.png" alt="D23 AI" width={40} height={40} className="h-10 w-10" />
+            <Image src="/d23ai-logo-v7.svg" alt="D23 AI" width={40} height={40} className="h-10 w-10" />
             <div>
               <p className="text-lg font-semibold text-foreground">{footerData.logo}</p>
               <p className="text-sm text-foreground/60">WhatsApp-native AI for Bharat.</p>

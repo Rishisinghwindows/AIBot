@@ -13,6 +13,7 @@ Handles all astrology-related intents:
 from app.graph.state import BotState
 from app.services.astrology_service import get_astrology_service
 from app.logger import logger
+from app.i18n.translator import t, get_zodiac_in_language
 
 ZODIAC_SIGNS = [
     "aries", "taurus", "gemini", "cancer", "leo", "virgo",
@@ -30,22 +31,43 @@ async def handle_horoscope(state: BotState) -> dict:
     sign = entities.get("astro_sign", "").strip().lower()
     period = entities.get("astro_period", "today").strip().lower()
 
+    # Get user's language for localized response
+    lang = state.get("detected_language", "en")
+
     if not sign or sign not in ZODIAC_SIGNS:
-        signs_list = ", ".join([s.title() for s in ZODIAC_SIGNS])
-        return {
-            "response_text": (
-                "*Horoscope*\n\n"
-                "Please specify your zodiac sign.\n\n"
-                f"*Available signs:*\n{signs_list}\n\n"
-                "*Examples:*\n"
-                "- Aries horoscope\n"
-                "- Leo weekly horoscope\n"
-                "- Scorpio monthly prediction"
-            ),
-            "response_type": "text",
-            "should_fallback": False,
-            "intent": "get_horoscope",
-        }
+        # Get zodiac signs in user's language
+        signs_list = ", ".join([get_zodiac_in_language(s, lang) for s in ZODIAC_SIGNS])
+
+        if lang == "hi":
+            return {
+                "response_text": (
+                    "*राशिफल*\n\n"
+                    "कृपया अपनी राशि बताएं।\n\n"
+                    f"*उपलब्ध राशियां:*\n{signs_list}\n\n"
+                    "*उदाहरण:*\n"
+                    "- मेष राशिफल\n"
+                    "- सिंह साप्ताहिक राशिफल\n"
+                    "- वृश्चिक मासिक राशिफल"
+                ),
+                "response_type": "text",
+                "should_fallback": False,
+                "intent": "get_horoscope",
+            }
+        else:
+            return {
+                "response_text": (
+                    "*Horoscope*\n\n"
+                    "Please specify your zodiac sign.\n\n"
+                    f"*Available signs:*\n{signs_list}\n\n"
+                    "*Examples:*\n"
+                    "- Aries horoscope\n"
+                    "- Leo weekly horoscope\n"
+                    "- Scorpio monthly prediction"
+                ),
+                "response_type": "text",
+                "should_fallback": False,
+                "intent": "get_horoscope",
+            }
 
     try:
         astrology_service = get_astrology_service()
@@ -55,16 +77,34 @@ async def handle_horoscope(state: BotState) -> dict:
             data = result.get("data", {})
             horoscope = data.get("horoscope", data.get("description", "No prediction available"))
 
-            period_display = period.capitalize() if period in ["today", "tomorrow", "yesterday"] else period.title()
+            # Get zodiac sign name in user's language
+            sign_localized = get_zodiac_in_language(sign, lang)
 
-            response_text = f"*{sign.title()} {period_display} Horoscope*\n\n{horoscope}"
+            if lang == "hi":
+                # Hindi response
+                period_map = {"today": "आज का", "weekly": "साप्ताहिक", "monthly": "मासिक"}
+                period_display = period_map.get(period, period.title())
 
-            if data.get("lucky_number"):
-                response_text += f"\n\n*Lucky Number:* {data['lucky_number']}"
-            if data.get("lucky_color"):
-                response_text += f"\n*Lucky Color:* {data['lucky_color']}"
-            if data.get("advice"):
-                response_text += f"\n\n*Advice:* {data['advice']}"
+                response_text = f"*{sign_localized} {period_display} राशिफल*\n\n{horoscope}"
+
+                if data.get("lucky_number"):
+                    response_text += f"\n\n*{t('horoscope.lucky_number', lang)}:* {data['lucky_number']}"
+                if data.get("lucky_color"):
+                    response_text += f"\n*{t('horoscope.lucky_color', lang)}:* {data['lucky_color']}"
+                if data.get("advice"):
+                    response_text += f"\n\n*{t('horoscope.advice', lang)}:* {data['advice']}"
+            else:
+                # English response
+                period_display = period.capitalize() if period in ["today", "tomorrow", "yesterday"] else period.title()
+
+                response_text = f"*{sign_localized} {period_display} Horoscope*\n\n{horoscope}"
+
+                if data.get("lucky_number"):
+                    response_text += f"\n\n*Lucky Number:* {data['lucky_number']}"
+                if data.get("lucky_color"):
+                    response_text += f"\n*Lucky Color:* {data['lucky_color']}"
+                if data.get("advice"):
+                    response_text += f"\n\n*Advice:* {data['advice']}"
 
             return {
                 "tool_result": result,
@@ -74,9 +114,10 @@ async def handle_horoscope(state: BotState) -> dict:
                 "intent": "get_horoscope",
             }
         else:
+            error_msg = t("errors.general", lang) if lang != "en" else "Sorry, couldn't get the horoscope."
             return {
                 "tool_result": result,
-                "response_text": f"*Horoscope*\n\nSorry, couldn't get the horoscope. {result.get('error', '')}",
+                "response_text": f"*{'राशिफल' if lang == 'hi' else 'Horoscope'}*\n\n{error_msg} {result.get('error', '')}",
                 "response_type": "text",
                 "should_fallback": False,
                 "intent": "get_horoscope",
@@ -84,9 +125,10 @@ async def handle_horoscope(state: BotState) -> dict:
 
     except Exception as e:
         logger.error(f"Horoscope handler error: {e}")
+        error_msg = t("errors.general", lang) if lang != "en" else "An error occurred while fetching the horoscope."
         return {
             "error": str(e),
-            "response_text": "*Horoscope*\n\nAn error occurred while fetching the horoscope.\n\n_Please try again._",
+            "response_text": f"*{'राशिफल' if lang == 'hi' else 'Horoscope'}*\n\n{error_msg}\n\n_{t('common.try_again', lang)}_",
             "response_type": "text",
             "should_fallback": False,
             "intent": "get_horoscope",

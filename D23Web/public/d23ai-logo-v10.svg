@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 140" fill="none">
+  <defs>
+    <!-- Premium violet gradient -->
+    <linearGradient id="premViolet" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#7C3AED"/>
+      <stop offset="40%" style="stop-color:#A855F7"/>
+      <stop offset="70%" style="stop-color:#D946EF"/>
+      <stop offset="100%" style="stop-color:#F472B6"/>
+    </linearGradient>
+
+    <!-- 3D depth shadow -->
+    <filter id="depth10" x="-20%" y="-20%" width="150%" height="150%">
+      <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#4C1D95" flood-opacity="0.5"/>
+    </filter>
+
+    <!-- Top shine -->
+    <linearGradient id="topShine10" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:rgba(255,255,255,0.5)"/>
+      <stop offset="30%" style="stop-color:rgba(255,255,255,0.2)"/>
+      <stop offset="50%" style="stop-color:rgba(255,255,255,0)"/>
+    </linearGradient>
+
+    <!-- Text shadow -->
+    <filter id="textShadow10">
+      <feDropShadow dx="0" dy="2" stdDeviation="1" flood-color="rgba(0,0,0,0.3)"/>
+    </filter>
+  </defs>
+
+  <!-- Base with shadow -->
+  <rect x="14" y="18" width="116" height="116" rx="28" fill="#4C1D95" opacity="0.5"/>
+
+  <!-- Main shape -->
+  <rect x="10" y="10" width="116" height="116" rx="28" fill="url(#premViolet)" filter="url(#depth10)"/>
+
+  <!-- Shine overlay -->
+  <rect x="10" y="10" width="116" height="58" rx="28" fill="url(#topShine10)"/>
+
+  <!-- Inner stroke -->
+  <rect x="14" y="14" width="108" height="108" rx="24" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="1.5"/>
+
+  <!-- D23AI premium text -->
+  <text x="68" y="70" text-anchor="middle" font-family="-apple-system, 'SF Pro Display', system-ui, sans-serif" font-size="36" font-weight="800" letter-spacing="-1" fill="white" filter="url(#textShadow10)">D23AI</text>
+
+  <!-- Subtitle -->
+  <text x="68" y="95" text-anchor="middle" font-family="system-ui, sans-serif" font-size="9" font-weight="600" letter-spacing="3" fill="rgba(255,255,255,0.7)">INTELLIGENCE</text>
+
+  <!-- Premium star -->
+  <g transform="translate(108,26)">
+    <polygon points="0,-7 2,-2 7,0 2,2 0,7 -2,2 -7,0 -2,-2" fill="white" opacity="0.9"/>
+  </g>
+
+  <!-- Bottom highlight line -->
+  <line x1="35" y1="108" x2="101" y2="108" stroke="rgba(255,255,255,0.2)" stroke-width="1" stroke-linecap="round"/>
+</svg>

@@ -12,6 +12,7 @@ class GitHubService:
     GitHub client for repository operations.
 
     Supports:
+      - Repositories: list user repos
       - Issues: search, create
       - Commits: list recent, view details
       - Pull Requests: list, view details
@@ -19,23 +20,75 @@ class GitHubService:
 
     Requires:
       - token: GitHub PAT with repo scope
-      - owner: repo owner/org
-      - repo: repository name
+      - owner: repo owner/org (optional for list_repos)
+      - repo: repository name (optional for list_repos)
     """
 
     def __init__(self, token: Optional[str], owner: Optional[str], repo: Optional[str]) -> None:
         self.token = token or ""
         self.owner = owner or ""
         self.repo = repo or ""
-        self.available = all([self.token, self.owner, self.repo])
+        # available = has token (can at least list repos)
+        self.available = bool(self.token)
+        # repo_available = has full config for repo-specific operations
+        self.repo_available = all([self.token, self.owner, self.repo])
 
     @property
     def _base(self) -> str:
         return f"https://api.github.com/repos/{self.owner}/{self.repo}"
 
+    # =========================================================================
+    # USER REPOSITORIES API (works without specific repo configured)
+    # =========================================================================
+
+    async def list_repos(self, limit: int = 20, sort: str = "updated") -> str:
+        """List repositories for the authenticated user.
+
+        Args:
+            limit: Max number of repos to return (default 20, max 100)
+            sort: Sort by 'updated', 'created', 'pushed', 'full_name' (default 'updated')
+        """
+        if not self.token:
+            return "GitHub not connected. Please connect GitHub from Settings first."
+
+        url = "https://api.github.com/user/repos"
+        params = {
+            "per_page": min(limit, 100),
+            "sort": sort,
+            "direction": "desc",
+            "type": "all",
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=10, headers=self._headers()) as client:
+                resp = await client.get(url, params=params)
+                resp.raise_for_status()
+                repos = resp.json()
+
+                if not repos:
+                    return "No repositories found."
+
+                parts = []
+                for repo in repos:
+                    name = repo.get("full_name", "")
+                    is_private = "🔒" if repo.get("private") else "📂"
+                    stars = repo.get("stargazers_count", 0)
+                    lang = repo.get("language") or "No language"
+                    desc = (repo.get("description") or "")[:50]
+                    if len(desc) == 50:
+                        desc += "..."
+                    parts.append(f"{is_private} **{name}** ({lang}, ⭐{stars})")
+                    if desc:
+                        parts.append(f"   {desc}")
+
+                return f"Your GitHub repositories ({len(repos)}):\n" + "\n".join(parts)
+        except Exception as exc:
+            logger.error("github_list_repos_error", error=_format_error(exc))
+            return f"GitHub list repos failed: {_format_error(exc)}"
+
     async def search_issues(self, query: str) -> str:
-        if not self.available:
-            return "GitHub not configured. Provide token, owner, and repo."
+        if not self.repo_available:
+            return "GitHub repo not configured. Use 'set repo <owner/repo>' to configure a repository first."
         # Search limited to given repo
         q = f"repo:{self.owner}/{self.repo} {query}"
         url = "https://api.github.com/search/issues"
@@ -59,8 +112,8 @@ class GitHubService:
             return f"GitHub search failed: {_format_error(exc)}"
 
     async def create_issue(self, title: str, body: str) -> str:
-        if not self.available:
-            return "GitHub not configured. Provide token, owner, and repo."
+        if not self.repo_available:
+            return "GitHub repo not configured. Use 'set repo <owner/repo>' to configure a repository first."
         url = f"{self._base}/issues"
         try:
             async with httpx.AsyncClient(timeout=10, headers=self._headers()) as client:
@@ -87,8 +140,8 @@ class GitHubService:
 
     async def list_commits(self, limit: int = 10, branch: str = "") -> str:
         """List recent commits in the repository."""
-        if not self.available:
-            return "GitHub not configured. Provide token, owner, and repo."
+        if not self.repo_available:
+            return "GitHub repo not configured. Use 'set repo <owner/repo>' to configure a repository first."
 
         url = f"{self._base}/commits"
         params = {"per_page": min(limit, 30)}
@@ -119,8 +172,8 @@ class GitHubService:
 
     async def get_commit(self, sha: str) -> str:
         """Get details of a specific commit."""
-        if not self.available:
-            return "GitHub not configured. Provide token, owner, and repo."
+        if not self.repo_available:
+            return "GitHub repo not configured. Use 'set repo <owner/repo>' to configure a repository first."
 
         url = f"{self._base}/commits/{sha}"
         try:
@@ -153,8 +206,8 @@ class GitHubService:
 
     async def list_pull_requests(self, state: str = "open", limit: int = 10) -> str:
         """List pull requests in the repository."""
-        if not self.available:
-            return "GitHub not configured. Provide token, owner, and repo."
+        if not self.repo_available:
+            return "GitHub repo not configured. Use 'set repo <owner/repo>' to configure a repository first."
 
         url = f"{self._base}/pulls"
         params = {"state": state, "per_page": min(limit, 30)}
@@ -183,8 +236,8 @@ class GitHubService:
 
     async def get_pull_request(self, pr_number: int) -> str:
         """Get details of a specific pull request."""
-        if not self.available:
-            return "GitHub not configured. Provide token, owner, and repo."
+        if not self.repo_available:
+            return "GitHub repo not configured. Use 'set repo <owner/repo>' to configure a repository first."
 
         url = f"{self._base}/pulls/{pr_number}"
         try:
@@ -211,8 +264,8 @@ class GitHubService:
 
     async def get_repo_info(self) -> str:
         """Get repository information."""
-        if not self.available:
-            return "GitHub not configured. Provide token, owner, and repo."
+        if not self.repo_available:
+            return "GitHub repo not configured. Use 'set repo <owner/repo>' to configure a repository first."
 
         try:
             async with httpx.AsyncClient(timeout=10, headers=self._headers()) as client:
@@ -235,8 +288,8 @@ class GitHubService:
 
     async def list_branches(self, limit: int = 10) -> str:
         """List branches in the repository."""
-        if not self.available:
-            return "GitHub not configured. Provide token, owner, and repo."
+        if not self.repo_available:
+            return "GitHub repo not configured. Use 'set repo <owner/repo>' to configure a repository first."
 
         url = f"{self._base}/branches"
         try:
@@ -261,8 +314,8 @@ class GitHubService:
 
     async def list_contributors(self, limit: int = 10) -> str:
         """List top contributors to the repository."""
-        if not self.available:
-            return "GitHub not configured. Provide token, owner, and repo."
+        if not self.repo_available:
+            return "GitHub repo not configured. Use 'set repo <owner/repo>' to configure a repository first."
 
         url = f"{self._base}/contributors"
         try:
@@ -287,8 +340,8 @@ class GitHubService:
 
     async def get_file_content(self, path: str, branch: str = "") -> str:
         """Get content of a file from the repository."""
-        if not self.available:
-            return "GitHub not configured. Provide token, owner, and repo."
+        if not self.repo_available:
+            return "GitHub repo not configured. Use 'set repo <owner/repo>' to configure a repository first."
 
         url = f"{self._base}/contents/{path}"
         params = {}

@@ -34,7 +34,27 @@
       "Bash(pg_config:*)",
       "Bash(PGPASSWORD=password psql:*)",
       "Bash(./venv/bin/alembic upgrade:*)",
-      "Bash(cp:*)"
+      "Bash(cp:*)",
+      "Bash(python:*)",
+      "Bash(tee:*)",
+      "Bash(SESSION_ID=\"8l9cJACjyFvvn2XWqZwjxhtuDme65-BZwZfWkY-OKz8\")",
+      "Bash(redis-cli:*)",
+      "Bash(redis-server:*)",
+      "Bash(brew list:*)",
+      "Bash(echo:*)",
+      "Bash(/usr/libexec/ApplicationFirewall/socketfilterfw:*)",
+      "Bash(sudo lsof:*)",
+      "Bash(xargs ps:*)",
+      "Bash(node --version:*)",
+      "Bash(npm --version)",
+      "Bash(npm install:*)",
+      "Bash(mcp-server-github:*)",
+      "Bash(npx @modelcontextprotocol/server-github:*)",
+      "Bash(jq -r '.access_token' \")",
+      "Bash(nginx -t:*)",
+      "Bash(npm run build:*)",
+      "Bash(sudo nginx:*)",
+      "Bash(brew upgrade:*)"
     ]
   }
 }

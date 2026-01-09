@@ -1,0 +1,15 @@
+# OhGrt API specific dependencies
+# Include common requirements
+-r requirements.txt
+
+# Additional API-specific dependencies
+# OAuth providers
+google-auth>=2.27.0
+google-auth-oauthlib>=1.2.0
+google-api-python-client>=2.115.0
+
+# Vector database for RAG
+pgvector>=0.2.0
+
+# Encryption
+cryptography>=41.0.7

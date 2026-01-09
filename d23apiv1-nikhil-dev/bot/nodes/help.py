@@ -13,8 +13,11 @@ INTENT = "help"
 
 HELP_RESPONSE = """I can help you with a variety of tasks tailored for Indian users! Here's what I can do for you:
 
-• 🛒 *Grocery & Product Search*: Find items on Instamart near you.
-• 🍔 *Food Delivery*: Search for restaurants or dishes on Swiggy (delivery or dine-out).
+• 🎫 *Events & Tickets*: Find IPL matches, concerts, comedy shows, and book tickets.
+• 🏏 *IPL Matches*: Get upcoming IPL matches, team schedules (RCB, CSK, MI, etc.).
+• 🎵 *Concerts*: Find live music shows and concerts near you.
+• 😂 *Comedy Shows*: Discover standup comedy events.
+• 🍽️ *Food & Restaurants*: Find restaurants by city and cuisine, popular dishes and ratings.
 • 🚆 *Train Info*: Check live train status, PNR status, schedules, or trains between stations.
 • 🔍 *Web Search*: Get the latest news, facts, or info not in my training data.
 • 📝 *Fact-Checking*: Verify the truthfulness of any text or claim.

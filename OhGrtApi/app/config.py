@@ -93,7 +93,7 @@ class Settings(BaseSettings):
     google_oauth_client_id: str = ""
     google_oauth_client_secret: str = ""
     google_oauth_redirect_uri: str = "http://localhost:3000/settings/gmail/callback"
-    google_gmail_scopes: str = "https://www.googleapis.com/auth/gmail.readonly"
+    google_gmail_scopes: str = "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send"
     google_drive_scopes: str = "https://www.googleapis.com/auth/drive.readonly"
 
     # Jira/Atlassian OAuth
@@ -168,6 +168,9 @@ class Settings(BaseSettings):
 
     # Tavily Search
     tavily_api_key: str = Field(default="", description="Tavily API key for web search")
+
+    # Serper API for local search
+    serper_api_key: str = Field(default="", description="Serper API key for local/places search")
 
     # Railway/Travel APIs
     railway_api_key: str = Field(default="", description="RapidAPI key for railway APIs")

@@ -17,7 +17,7 @@ import secrets
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Dict, Any
 
-from fastapi import APIRouter, HTTPException, Request, Response, File, UploadFile
+from fastapi import APIRouter, Form, HTTPException, Request, Response, File, UploadFile
 from pydantic import BaseModel, Field
 
 from app.config import get_settings
@@ -693,6 +693,133 @@ class TranscriptionResponse(BaseModel):
     text: str
     language: str = "en"
     confidence: Optional[float] = None
+
+
+class ImageChatResponse(BaseModel):
+    """Response from image chat endpoint."""
+    user_message: WebChatMessage
+    assistant_message: WebChatMessage
+    detected_language: str = "en"
+
+
+@router.post("/chat/image", response_model=ImageChatResponse)
+async def chat_with_image(
+    session_id: str = Form(...),
+    message: str = Form(""),
+    image: UploadFile = File(...),
+) -> ImageChatResponse:
+    """
+    Send an image with optional message and get AI analysis.
+
+    Uses OpenAI GPT-4 Vision to analyze the image.
+    """
+    redis_store = await get_session_store()
+    store = SessionStoreWrapper(redis_store)
+    session = await store.get_session(session_id)
+
+    if not session:
+        raise HTTPException(status_code=401, detail="Invalid or expired session")
+
+    # Rate limiting check
+    message_count = await store.get_message_count(session_id)
+    if message_count >= 50:
+        raise HTTPException(
+            status_code=429,
+            detail="Rate limit exceeded. Please try again later."
+        )
+
+    try:
+        # Read image content
+        image_content = await image.read()
+
+        # Check file size (max 20MB)
+        if len(image_content) > 20 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="Image too large (max 20MB)")
+
+        # Convert to base64
+        import base64
+        image_base64 = base64.b64encode(image_content).decode("utf-8")
+
+        # Determine media type
+        content_type = image.content_type or "image/jpeg"
+        if "png" in (image.filename or "").lower():
+            content_type = "image/png"
+        elif "gif" in (image.filename or "").lower():
+            content_type = "image/gif"
+        elif "webp" in (image.filename or "").lower():
+            content_type = "image/webp"
+
+        # Create user message
+        user_content = message.strip() if message else "What's in this image?"
+        user_msg = WebChatMessage(
+            id=str(uuid.uuid4()),
+            role="user",
+            content=user_content,
+            timestamp=datetime.now(timezone.utc),
+            language="en",
+            media_url=f"data:{content_type};base64,{image_base64[:100]}...",  # Truncated for storage
+        )
+        await store.add_message(session_id, user_msg)
+
+        # Use OpenAI Vision API
+        settings = get_settings()
+        if not settings.openai_api_key:
+            raise HTTPException(status_code=503, detail="Vision service not configured")
+
+        import openai
+        client = openai.OpenAI(api_key=settings.openai_api_key)
+
+        vision_response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": user_content},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:{content_type};base64,{image_base64}",
+                                "detail": "auto"
+                            }
+                        }
+                    ]
+                }
+            ],
+            max_tokens=1000,
+        )
+
+        assistant_content = vision_response.choices[0].message.content or "I couldn't analyze this image."
+
+        # Create assistant message
+        assistant_msg = WebChatMessage(
+            id=str(uuid.uuid4()),
+            role="assistant",
+            content=assistant_content,
+            timestamp=datetime.now(timezone.utc),
+            language="en",
+            intent="image_analysis",
+        )
+        await store.add_message(session_id, assistant_msg)
+        await store.increment_message_count(session_id)
+
+        logger.info(
+            "web_image_chat",
+            session_id=session_id[:8],
+            image_size=len(image_content),
+        )
+
+        return ImageChatResponse(
+            user_message=user_msg,
+            assistant_message=assistant_msg,
+            detected_language="en",
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Image chat error: {e}")
+        raise HTTPException(status_code=500, detail=f"Image analysis failed: {str(e)}")
 
 
 @router.post("/transcribe", response_model=TranscriptionResponse)

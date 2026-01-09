@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 140" fill="none">
+  <defs>
+    <!-- Electric gradient -->
+    <linearGradient id="electricGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3B82F6"/>
+      <stop offset="50%" style="stop-color:#8B5CF6"/>
+      <stop offset="100%" style="stop-color:#D946EF"/>
+    </linearGradient>
+
+    <!-- Glossy overlay -->
+    <linearGradient id="glossy6" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:rgba(255,255,255,0.35)"/>
+      <stop offset="40%" style="stop-color:rgba(255,255,255,0.1)"/>
+      <stop offset="60%" style="stop-color:rgba(0,0,0,0.05)"/>
+      <stop offset="100%" style="stop-color:rgba(0,0,0,0.1)"/>
+    </linearGradient>
+
+    <filter id="dropShadow6">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#8B5CF6" flood-opacity="0.4"/>
+    </filter>
+  </defs>
+
+  <!-- iOS-style squircle -->
+  <rect x="12" y="12" width="116" height="116" rx="28" fill="url(#electricGrad)" filter="url(#dropShadow6)"/>
+
+  <!-- Glossy overlay -->
+  <rect x="12" y="12" width="116" height="58" rx="28" fill="url(#glossy6)"/>
+
+  <!-- Inner highlight border -->
+  <rect x="16" y="16" width="108" height="108" rx="24" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+
+  <!-- D23 large -->
+  <text x="70" y="70" text-anchor="middle" font-family="-apple-system, 'SF Pro Display', system-ui, sans-serif" font-size="40" font-weight="800" letter-spacing="-2" fill="white">D23</text>
+
+  <!-- AI badge pill -->
+  <rect x="48" y="82" width="44" height="22" rx="11" fill="rgba(0,0,0,0.2)"/>
+  <rect x="49" y="83" width="42" height="20" rx="10" fill="rgba(255,255,255,0.15)"/>
+  <text x="70" y="97" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" font-weight="700" letter-spacing="2" fill="white">AI</text>
+
+  <!-- Animated pulse ring -->
+  <rect x="12" y="12" width="116" height="116" rx="28" fill="none" stroke="white" stroke-width="1" opacity="0.3">
+    <animate attributeName="opacity" values="0.3;0;0.3" dur="2s" repeatCount="indefinite"/>
+  </rect>
+</svg>

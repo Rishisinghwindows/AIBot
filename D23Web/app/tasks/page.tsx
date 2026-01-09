@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/select";
 import { TaskCard, ScheduledTask } from "@/components/tasks/TaskCard";
 import { CreateTaskDialog, CreateTaskData } from "@/components/tasks/CreateTaskDialog";
+import { EditTaskDialog, EditTaskData } from "@/components/tasks/EditTaskDialog";
 import {
   Plus,
   Search,
@@ -36,9 +37,11 @@ export default function TasksPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [editingTask, setEditingTask] = useState<ScheduledTask | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
 
-  const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  const apiBase = "/api"; // Use Next.js proxy to avoid CORS
 
   // Check if user is authenticated
   const isAuthenticated = !!currentUser && !!accessToken;
@@ -210,6 +213,42 @@ export default function TasksPage() {
         fetchTasks();
       }
     }
+  };
+
+  // Open edit dialog
+  const handleOpenEdit = (task: ScheduledTask) => {
+    setEditingTask(task);
+    setShowEditDialog(true);
+  };
+
+  // Edit task
+  const handleEditTask = async (taskId: string, updates: EditTaskData) => {
+    if (isAuthenticated) {
+      const response = await authFetch(`${apiBase}/tasks/${taskId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update task");
+      }
+    } else if (sessionId) {
+      const response = await fetch(
+        `${apiBase}/web/tasks/${taskId}?session_id=${sessionId}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(updates),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to update task");
+      }
+    }
+
+    await fetchTasks();
   };
 
   // Filter tasks by search query
@@ -390,6 +429,7 @@ export default function TasksPage() {
                 onPause={handlePauseTask}
                 onResume={handleResumeTask}
                 onDelete={handleDeleteTask}
+                onEdit={handleOpenEdit}
               />
             ))}
           </div>
@@ -401,6 +441,17 @@ export default function TasksPage() {
         open={showCreateDialog}
         onOpenChange={setShowCreateDialog}
         onSubmit={handleCreateTask}
+      />
+
+      {/* Edit Dialog */}
+      <EditTaskDialog
+        open={showEditDialog}
+        onOpenChange={(open) => {
+          setShowEditDialog(open);
+          if (!open) setEditingTask(null);
+        }}
+        task={editingTask}
+        onSubmit={handleEditTask}
       />
     </div>
   );

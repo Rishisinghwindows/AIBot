@@ -26,6 +26,7 @@ from app.oauth import gmail_router, github_router, slack_router, jira_router, ub
 from app.personas.router import router as personas_router, public_router as personas_public_router
 from app.mcp.router import router as mcp_router
 from app.tasks.scheduler import start_scheduler, stop_scheduler
+from app.services.email_scheduler import start_email_scheduler, stop_email_scheduler
 from app.config import Settings, get_settings
 from app.db.base import Base, engine, SessionLocal
 from app.exceptions import OhGrtException, RateLimitExceededError, ServiceUnavailableError
@@ -281,6 +282,13 @@ async def startup_event() -> None:
     # Start the task scheduler
     await start_scheduler()
 
+    # Start the email scheduler
+    try:
+        start_email_scheduler()
+        logger.info("email_scheduler_started")
+    except Exception as e:
+        logger.warning("email_scheduler_start_failed", error=str(e))
+
     # Start MCP health checks (background monitoring)
     try:
         from app.mcp.manager import MCPManager
@@ -297,6 +305,13 @@ async def startup_event() -> None:
 async def shutdown_event() -> None:
     """Shutdown handler - stop background services."""
     await stop_scheduler()
+
+    # Stop email scheduler
+    try:
+        stop_email_scheduler()
+        logger.info("email_scheduler_stopped")
+    except Exception as e:
+        logger.warning("email_scheduler_stop_failed", error=str(e))
 
     # Stop MCP health checks
     try:

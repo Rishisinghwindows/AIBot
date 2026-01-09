@@ -10,6 +10,7 @@ from langgraph.prebuilt import create_react_agent
 
 from app.services.confluence_service import ConfluenceService
 from app.services.github_service import GitHubService
+from app.services.github_mcp_service import GitHubMCPService
 from app.services.gmail_service import GmailService
 from app.services.drive_service import GoogleDriveService
 from app.services.jira_service import JiraService
@@ -83,9 +84,13 @@ class ToolAgent:
             base_url=mcp_creds.get("config", {}).get("base_url"),
             token=mcp_creds.get("access_token"),
         )
+        # GitHub service - prefer MCP, fallback to REST API
         github_creds = self.credentials.get("github", {})
+        github_token = github_creds.get("access_token")
+        self.github_mcp_service = GitHubMCPService(token=github_token)
+        # Keep REST service as fallback for repo-specific operations
         self.github_service = GitHubService(
-            token=github_creds.get("access_token"),
+            token=github_token,
             owner=github_creds.get("config", {}).get("owner"),
             repo=github_creds.get("config", {}).get("repo"),
         )
@@ -163,7 +168,56 @@ class ToolAgent:
                 return "Gmail not configured. Per-user Gmail OAuth is not available in this build."
 
             gmail_agent = GmailAgent(self.gmail_service, llm)
-            return await gmail_agent.run(query)
+            text_response, structured_data = await gmail_agent.run(query)
+
+            # Store structured data for email list with clickable IDs
+            if structured_data:
+                last_tool["structured_data"] = structured_data
+
+            return text_response
+
+        @tool("gmail_send", return_direct=True)
+        async def gmail_send_tool(to: str = "", subject: str = "", body: str = "") -> str:
+            """Compose and send an email via Gmail. USE THIS TOOL IMMEDIATELY when user wants to send or schedule an email.
+
+            IMPORTANT:
+            - Call this tool as soon as user mentions sending/scheduling an email
+            - If user provides an email address, use it for 'to' field
+            - If details are missing, use empty strings - the user can fill them in the compose form
+            - Don't ask for details - just show the compose form
+
+            Args:
+                to: The recipient's email address (can be empty if not provided)
+                subject: The email subject line (can be empty, user will fill it)
+                body: The email body content (can be empty, user will fill it)
+
+            Returns a compose card where user can edit all fields and send/schedule.
+            """
+            last_tool["name"] = "gmail_send"
+
+            # Log the parameters received
+            logger.info(
+                "gmail_send_tool_invoked",
+                to=to,
+                subject=subject,
+                body_preview=body[:100] if body else "",
+            )
+
+            if not self.gmail_service.available:
+                return "Gmail not configured. Please connect Gmail via Settings > Integrations."
+
+            # Return compose data for preview - don't send yet
+            last_tool["structured_data"] = {
+                "type": "email_compose",
+                "to": to or "",
+                "subject": subject or "",
+                "body": body or "",
+            }
+
+            if to:
+                return f"I've opened the compose form for {to}. Please review, edit if needed, and click Send or Schedule."
+            else:
+                return "I've opened the email compose form. Please fill in the details and click Send or Schedule when ready."
 
         @tool("google_drive_list", return_direct=True)
         async def google_drive_list_tool(query: str = "") -> str:
@@ -228,65 +282,133 @@ class ToolAgent:
                 return "Slack not configured. Set SLACK_TOKEN (and workspace settings) to enable."
             return await self.slack_service.post_message(channel, text)
 
-        @tool("github_search", return_direct=True)
-        async def github_search_tool(query: str) -> str:
-            """Search GitHub issues in the configured repo."""
-            last_tool["name"] = "github"
-            return await self.github_service.search_issues(query)
+        # =========================================================================
+        # GitHub MCP Tools - Using official @modelcontextprotocol/server-github
+        # =========================================================================
 
-        @tool("github_create", return_direct=True)
-        async def github_create_tool(title: str, body: str) -> str:
-            """Create a GitHub issue in the configured repo."""
+        @tool("github_repos", return_direct=True)
+        async def github_repos_tool(query: str = "") -> str:
+            """List or search GitHub repositories. Use this tool when user asks to:
+            - list my repositories / repos
+            - show my GitHub repos
+            - search GitHub repositories
+            - find repos on GitHub
+            The query parameter is optional - leave empty to list user's own repos."""
             last_tool["name"] = "github"
-            return await self.github_service.create_issue(title, body)
+            if not self.github_mcp_service.available:
+                return "GitHub not connected. Please connect GitHub from Settings first."
+            if not query:
+                query = "user:@me"
+            return await self.github_mcp_service.search_repos(query)
 
-        @tool("github_commits", return_direct=True)
-        async def github_commits_tool(limit: int = 10, branch: str = "") -> str:
-            """List recent commits in the GitHub repo. Optional: limit (default 10), branch name."""
+        @tool("github_search_issues", return_direct=True)
+        async def github_search_issues_tool(query: str) -> str:
+            """Search GitHub issues across repositories. Example: 'is:open label:bug'"""
             last_tool["name"] = "github"
-            return await self.github_service.list_commits(limit=limit, branch=branch)
+            if not self.github_mcp_service.available:
+                return "GitHub not connected. Please connect GitHub from Settings first."
+            return await self.github_mcp_service.search_issues(query)
 
-        @tool("github_commit_detail", return_direct=True)
-        async def github_commit_detail_tool(sha: str) -> str:
-            """Get details of a specific commit by SHA hash."""
+        @tool("github_search_code", return_direct=True)
+        async def github_search_code_tool(query: str) -> str:
+            """Search for code in GitHub repositories. Example: 'function auth repo:owner/repo'"""
             last_tool["name"] = "github"
-            return await self.github_service.get_commit(sha)
+            if not self.github_mcp_service.available:
+                return "GitHub not connected. Please connect GitHub from Settings first."
+            return await self.github_mcp_service.search_code(query)
 
-        @tool("github_prs", return_direct=True)
-        async def github_prs_tool(state: str = "open", limit: int = 10) -> str:
-            """List pull requests. State can be: open, closed, all. Default: open."""
+        @tool("github_list_issues", return_direct=True)
+        async def github_list_issues_tool(owner: str, repo: str, state: str = "open") -> str:
+            """List issues in a repository. State: open, closed, all."""
             last_tool["name"] = "github"
-            return await self.github_service.list_pull_requests(state=state, limit=limit)
+            if not self.github_mcp_service.available:
+                return "GitHub not connected. Please connect GitHub from Settings first."
+            return await self.github_mcp_service.list_issues(owner, repo, state)
 
-        @tool("github_pr_detail", return_direct=True)
-        async def github_pr_detail_tool(pr_number: int) -> str:
-            """Get details of a specific pull request by number."""
+        @tool("github_create_issue", return_direct=True)
+        async def github_create_issue_tool(owner: str, repo: str, title: str, body: str) -> str:
+            """Create a new issue in a repository."""
             last_tool["name"] = "github"
-            return await self.github_service.get_pull_request(pr_number)
+            if not self.github_mcp_service.available:
+                return "GitHub not connected. Please connect GitHub from Settings first."
+            return await self.github_mcp_service.create_issue(owner, repo, title, body)
 
-        @tool("github_repo_info", return_direct=True)
-        async def github_repo_info_tool() -> str:
-            """Get repository information (stars, forks, description, etc.)."""
+        @tool("github_list_commits", return_direct=True)
+        async def github_list_commits_tool(owner: str, repo: str, limit: int = 10) -> str:
+            """List recent commits in a repository."""
             last_tool["name"] = "github"
-            return await self.github_service.get_repo_info()
+            if not self.github_mcp_service.available:
+                return "GitHub not connected. Please connect GitHub from Settings first."
+            return await self.github_mcp_service.list_commits(owner, repo, limit)
 
-        @tool("github_branches", return_direct=True)
-        async def github_branches_tool(limit: int = 10) -> str:
-            """List branches in the repository."""
+        @tool("github_list_prs", return_direct=True)
+        async def github_list_prs_tool(owner: str, repo: str, state: str = "open") -> str:
+            """List pull requests in a repository. State: open, closed, all."""
             last_tool["name"] = "github"
-            return await self.github_service.list_branches(limit=limit)
+            if not self.github_mcp_service.available:
+                return "GitHub not connected. Please connect GitHub from Settings first."
+            return await self.github_mcp_service.list_pull_requests(owner, repo, state)
 
-        @tool("github_contributors", return_direct=True)
-        async def github_contributors_tool(limit: int = 10) -> str:
-            """List top contributors to the repository."""
+        @tool("github_my_open_prs", return_direct=True)
+        async def github_my_open_prs_tool() -> str:
+            """Get all your open pull requests across all repositories with clickable links."""
             last_tool["name"] = "github"
-            return await self.github_service.list_contributors(limit=limit)
+            if not self.github_mcp_service.available:
+                return "GitHub not connected. Please connect GitHub from Settings first."
+            return await self.github_mcp_service.search_my_open_prs()
 
-        @tool("github_file", return_direct=True)
-        async def github_file_tool(path: str, branch: str = "") -> str:
-            """Read a file from the repository. Provide file path (e.g., 'README.md')."""
+        @tool("github_list_branches", return_direct=True)
+        async def github_list_branches_tool(owner: str, repo: str) -> str:
+            """List branches in a repository."""
             last_tool["name"] = "github"
-            return await self.github_service.get_file_content(path=path, branch=branch)
+            if not self.github_mcp_service.available:
+                return "GitHub not connected. Please connect GitHub from Settings first."
+            return await self.github_mcp_service.list_branches(owner, repo)
+
+        @tool("github_get_file", return_direct=True)
+        async def github_get_file_tool(owner: str, repo: str, path: str, branch: str = "") -> str:
+            """Get contents of a file from a repository."""
+            last_tool["name"] = "github"
+            if not self.github_mcp_service.available:
+                return "GitHub not connected. Please connect GitHub from Settings first."
+            return await self.github_mcp_service.get_file_contents(owner, repo, path, branch)
+
+        @tool("github_fork", return_direct=True)
+        async def github_fork_tool(owner: str, repo: str) -> str:
+            """Fork a repository to your account."""
+            last_tool["name"] = "github"
+            if not self.github_mcp_service.available:
+                return "GitHub not connected. Please connect GitHub from Settings first."
+            return await self.github_mcp_service.fork_repository(owner, repo)
+
+        @tool("github_create_branch", return_direct=True)
+        async def github_create_branch_tool(owner: str, repo: str, branch: str, from_branch: str = "main") -> str:
+            """Create a new branch in a repository."""
+            last_tool["name"] = "github"
+            if not self.github_mcp_service.available:
+                return "GitHub not connected. Please connect GitHub from Settings first."
+            return await self.github_mcp_service.create_branch(owner, repo, branch, from_branch)
+
+        @tool("github_create_pr", return_direct=True)
+        async def github_create_pr_tool(owner: str, repo: str, title: str, body: str, head: str, base: str = "main") -> str:
+            """Create a pull request. head=source branch, base=target branch."""
+            last_tool["name"] = "github"
+            if not self.github_mcp_service.available:
+                return "GitHub not connected. Please connect GitHub from Settings first."
+            return await self.github_mcp_service.create_pull_request(owner, repo, title, body, head, base)
+
+        @tool("github_mcp_tool", return_direct=True)
+        async def github_mcp_tool(tool_name: str, arguments: str = "{}") -> str:
+            """Call any GitHub MCP tool directly. arguments should be JSON string."""
+            last_tool["name"] = "github"
+            if not self.github_mcp_service.available:
+                return "GitHub not connected. Please connect GitHub from Settings first."
+            import json
+            try:
+                args = json.loads(arguments)
+            except json.JSONDecodeError:
+                return f"Invalid JSON arguments: {arguments}"
+            return await self.github_mcp_service.call_tool(tool_name, args)
 
         @tool("confluence_search", return_direct=True)
         async def confluence_search_tool(query: str) -> str:
@@ -602,9 +724,9 @@ class ToolAgent:
 
         # ==================== IMAGE GENERATION TOOL ====================
 
-        @tool("image_gen", return_direct=True)
+        @tool("image", return_direct=True)
         async def image_gen_tool(prompt: str) -> str:
-            """Generate an AI image from a text description. Describe what you want to see."""
+            """Generate an AI image from a text description. Use this tool when user asks to generate, create, or make an image or picture."""
             last_tool["name"] = "image_gen"
             clean_prompt = _clean_prompt(prompt)
             result = await generate_image_fal(clean_prompt)
@@ -620,6 +742,92 @@ class ToolAgent:
                     return f"Here's the generated image for: {clean_prompt}"
             error = result.get("error", "Unknown error")
             return f"Could not generate image: {error}"
+
+        # ==================== LOCAL SEARCH TOOL ====================
+
+        @tool("local_search", return_direct=True)
+        async def local_search_tool(query: str, location: str = "") -> str:
+            """Search for local places like restaurants, hospitals, shops, etc.
+            Use this when user asks for places 'near me' or in a specific location.
+            Args:
+                query: What to search for (e.g., 'pizza', 'hospital', 'pharmacy')
+                location: City or area name. If empty, will ask user for location.
+            """
+            last_tool["name"] = "local_search"
+
+            # Extract the search term from common patterns
+            search_term = query.lower()
+            for pattern in ["near me", "nearby", "around me", "close to me", "nearest"]:
+                search_term = search_term.replace(pattern, "").strip()
+
+            if not location:
+                # No location provided - ask for it
+                return (
+                    f"📍 To find **{search_term or 'places'}** near you, I need your location.\n\n"
+                    f"Please either:\n"
+                    f"• Share your location using the 📍 button\n"
+                    f"• Or tell me the city/area (e.g., \"{search_term} in Delhi\")"
+                )
+
+            # If we have location, search using Serper Places API
+            if not self.settings.serper_api_key:
+                # Fallback to generic response without API
+                return (
+                    f"🔍 **{search_term.title()}** in **{location}**\n\n"
+                    f"I found your query but local search API is not configured.\n"
+                    f"Try searching on Google Maps: https://www.google.com/maps/search/{search_term}+{location.replace(' ', '+')}"
+                )
+
+            try:
+                import httpx
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    response = await client.post(
+                        "https://google.serper.dev/places",
+                        headers={
+                            "X-API-KEY": self.settings.serper_api_key,
+                            "Content-Type": "application/json",
+                        },
+                        json={
+                            "q": f"{search_term} in {location}",
+                            "gl": "in",  # India
+                            "hl": "en",
+                        }
+                    )
+
+                    if response.status_code == 200:
+                        data = response.json()
+                        places = data.get("places", [])[:5]
+
+                        if not places:
+                            return f"❌ No **{search_term}** found in **{location}**. Try a different search or location."
+
+                        result = f"🔍 **{search_term.title()}** in **{location}**\n\n"
+                        for i, place in enumerate(places, 1):
+                            title = place.get("title", "Unknown")
+                            address = place.get("address", "")
+                            rating = place.get("rating")
+                            reviews = place.get("reviews")
+                            phone = place.get("phoneNumber", "")
+
+                            result += f"**{i}. {title}**\n"
+                            if address:
+                                result += f"   📍 {address}\n"
+                            if rating:
+                                stars = "⭐" * int(rating)
+                                review_text = f" ({reviews} reviews)" if reviews else ""
+                                result += f"   {stars} {rating}{review_text}\n"
+                            if phone:
+                                result += f"   📞 {phone}\n"
+                            result += "\n"
+
+                        return result
+                    else:
+                        logger.error(f"Serper API error: {response.status_code}")
+                        return f"Could not search for places. Please try again."
+
+            except Exception as e:
+                logger.error(f"Local search error: {e}")
+                return f"Error searching for places: {str(e)}"
 
         # ==================== UBER TOOLS ====================
 
@@ -1026,22 +1234,28 @@ class ToolAgent:
             pdf_tool,
             sql_tool,
             gmail_tool,
+            gmail_send_tool,
             google_drive_list_tool,
             jira_search_tool,
             jira_create_tool,
             jira_add_watchers_tool,
             jira_remove_watcher_tool,
             slack_post_tool,
-            github_search_tool,
-            github_create_tool,
-            github_commits_tool,
-            github_commit_detail_tool,
-            github_prs_tool,
-            github_pr_detail_tool,
-            github_repo_info_tool,
-            github_branches_tool,
-            github_contributors_tool,
-            github_file_tool,
+            # GitHub MCP tools
+            github_repos_tool,
+            github_search_issues_tool,
+            github_search_code_tool,
+            github_list_issues_tool,
+            github_create_issue_tool,
+            github_list_commits_tool,
+            github_list_prs_tool,
+            github_my_open_prs_tool,
+            github_list_branches_tool,
+            github_get_file_tool,
+            github_fork_tool,
+            github_create_branch_tool,
+            github_create_pr_tool,
+            github_mcp_tool,
             confluence_search_tool,
             custom_mcp_tool,
             web_crawl_tool,
@@ -1063,6 +1277,8 @@ class ToolAgent:
             news_tool,
             # Image generation tool
             image_gen_tool,
+            # Local search tool
+            local_search_tool,
             # Uber tools
             uber_profile_tool,
             uber_history_tool,
@@ -1093,22 +1309,30 @@ class ToolAgent:
             "jira_remove_watcher": self.jira_service.available,
             "custom_mcp": self.custom_mcp_service.available,
             "gmail": self.gmail_service.available,
-            "github_search": self.github_service.available,
-            "github_create": self.github_service.available,
-            "github_commits": self.github_service.available,
-            "github_commit_detail": self.github_service.available,
-            "github_prs": self.github_service.available,
-            "github_pr_detail": self.github_service.available,
-            "github_repo_info": self.github_service.available,
-            "github_branches": self.github_service.available,
-            "github_contributors": self.github_service.available,
-            "github_file": self.github_service.available,
+            "gmail_send": self.gmail_service.available,
+            # GitHub MCP tools - all use the same availability check
+            "github_repos": self.github_mcp_service.available,
+            "github_search_issues": self.github_mcp_service.available,
+            "github_search_code": self.github_mcp_service.available,
+            "github_list_issues": self.github_mcp_service.available,
+            "github_create_issue": self.github_mcp_service.available,
+            "github_list_commits": self.github_mcp_service.available,
+            "github_list_prs": self.github_mcp_service.available,
+            "github_my_open_prs": self.github_mcp_service.available,
+            "github_list_branches": self.github_mcp_service.available,
+            "github_get_file": self.github_mcp_service.available,
+            "github_fork": self.github_mcp_service.available,
+            "github_create_branch": self.github_mcp_service.available,
+            "github_create_pr": self.github_mcp_service.available,
+            "github_mcp_tool": self.github_mcp_service.available,
             "google_drive_list": self.drive_service.available,
             "uber_profile": self.uber_service.available,
             "uber_history": self.uber_service.available,
             "uber_price": self.uber_service.available,
             "uber_eta": self.uber_service.available,
             "uber_products": self.uber_service.available,
+            # Local search - always available
+            "local_search": True,
             # Task tools require user_id
             "list_tasks": self.user_id is not None,
             "delete_task": self.user_id is not None,
@@ -1186,6 +1410,78 @@ class ToolAgent:
                     "category": RouterCategory.pdf.value,
                     "route_log": [RouterCategory.pdf.value],
                     "intent": RouterCategory.pdf.value,
+                    "structured_data": None,
+                }
+
+        # Explicit routing for GitHub-related queries
+        github_keywords = ["github", "repo", "repository", "repositories"]
+        action_keywords = ["list", "show", "get", "fetch", "display", "my"]
+        logger.info("github_routing_check", text=text, has_github_repos="github_repos" in tool_map, allowed_tools=str(allowed_tools)[:100])
+        if "github_repos" in tool_map and any(word in text for word in github_keywords):
+            logger.info("github_keyword_matched", keywords_found=[w for w in github_keywords if w in text])
+            # Allow if no restriction or github_repos is in allowed list
+            tools_allowed = allowed_tools is None or len(allowed_tools) == 0 or "github_repos" in allowed_tools
+            logger.info("github_tools_allowed_check", tools_allowed=tools_allowed, allowed_tools_type=type(allowed_tools).__name__)
+            if tools_allowed:
+                # Check for action keywords that indicate listing repos
+                has_action = any(word in text for word in action_keywords)
+                logger.info("github_action_check", has_action=has_action, text=text)
+                if has_action:
+                    logger.info("github_repos_invoking")
+                    try:
+                        result = await tool_map["github_repos"].ainvoke({"query": ""})
+                        logger.info("github_repos_result", result_length=len(str(result)))
+                        return {
+                            "response": result,
+                            "category": "github",
+                            "route_log": ["github"],
+                            "intent": "github_repos",
+                            "structured_data": None,
+                        }
+                    except Exception as e:
+                        logger.error("github_repos_error", error=str(e))
+                        return {
+                            "response": f"Error accessing GitHub: {str(e)}",
+                            "category": "github",
+                            "route_log": ["github"],
+                            "intent": "github_repos",
+                            "structured_data": None,
+                        }
+
+        # Explicit routing for "near me" / local search queries
+        near_me_keywords = ["near me", "nearby", "around me", "close to me", "nearest"]
+        search_terms = ["pizza", "restaurant", "hospital", "pharmacy", "atm", "hotel", "shop", "store", "cafe", "gym", "salon", "clinic", "bank", "petrol", "gas station", "food", "biryani", "burger", "coffee"]
+
+        # Check for "near me" queries (no location provided)
+        is_near_me = any(kw in text for kw in near_me_keywords)
+
+        # Check for "[search term] in [location]" pattern
+        has_search_term = any(term in text for term in search_terms)
+        import re
+        location_match = re.search(r'\b(?:in|at|near)\s+([a-zA-Z\s]+?)(?:\s*$|\s*\?)', text)
+        extracted_location = location_match.group(1).strip() if location_match else ""
+
+        # Route to local_search if it's a place search query
+        if "local_search" in tool_map and has_search_term and (is_near_me or extracted_location):
+            logger.info("local_search_routing", text=text, is_near_me=is_near_me, location=extracted_location)
+
+            try:
+                result = await tool_map["local_search"].ainvoke({"query": message, "location": extracted_location})
+                return {
+                    "response": result,
+                    "category": "local_search",
+                    "route_log": ["local_search"],
+                    "intent": "local_search",
+                    "structured_data": None,
+                    "requires_location": is_near_me and not extracted_location,
+                }
+            except Exception as e:
+                logger.error("local_search_error", error=str(e))
+                return {
+                    "response": f"Error searching for places: {str(e)}",
+                    "category": "local_search",
+                    "route_log": ["local_search"],
+                    "intent": "local_search",
                     "structured_data": None,
                 }
 

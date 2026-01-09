@@ -7,7 +7,8 @@
  * 3. Redirecting to login when refresh fails
  */
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
+// Use Next.js proxy to avoid CORS issues
+const API_URL = '/api';
 
 // Track if we're currently refreshing to prevent multiple refresh attempts
 let isRefreshing = false;

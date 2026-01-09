@@ -122,6 +122,22 @@ async def send_message(
 
     # Extract intent, structured_data, and media_url from metadata
     assistant_metadata = assistant_msg.message_metadata or {}
+
+    # Detect if location is required based on response content or metadata
+    response_content = assistant_msg.content.lower()
+    location_indicators = [
+        "i need your location",
+        "share your location",
+        "provide me with your location",
+        "need to know your location",
+        "📍 to find",
+        "please share your location",
+    ]
+    requires_location = (
+        assistant_metadata.get("requires_location", False) or
+        any(indicator in response_content for indicator in location_indicators)
+    )
+
     return ChatSendResponse(
         conversation_id=conv_id,
         user_message=ChatMessageResponse(
@@ -141,6 +157,7 @@ async def send_message(
             intent=assistant_metadata.get("intent") or assistant_metadata.get("category"),
             structured_data=assistant_metadata.get("structured_data"),
         ),
+        requires_location=requires_location,
     )
 
 
@@ -287,6 +304,402 @@ async def delete_conversation(
         raise HTTPException(status_code=404, detail="Conversation not found")
 
     return {"message": "Conversation deleted", "messages_deleted": deleted}
+
+
+# =============================================================================
+# EMAIL SEND ENDPOINT
+# =============================================================================
+
+from pydantic import BaseModel, EmailStr
+from typing import Optional as Opt
+
+
+class EmailSendRequest(BaseModel):
+    to: str
+    subject: str
+    body: str
+    cc: Opt[str] = None
+    bcc: Opt[str] = None
+
+
+class EmailSendResponse(BaseModel):
+    success: bool
+    message_id: Opt[str] = None
+    error: Opt[str] = None
+
+
+class EmailScheduleRequest(BaseModel):
+    to: str
+    subject: str
+    body: str
+    scheduled_at: datetime  # ISO format datetime
+    cc: Opt[str] = None
+    bcc: Opt[str] = None
+    timezone: str = "UTC"
+
+
+class EmailScheduleResponse(BaseModel):
+    success: bool
+    task_id: Opt[str] = None
+    scheduled_at: Opt[datetime] = None
+    error: Opt[str] = None
+
+
+@router.post(
+    "/email/send",
+    response_model=EmailSendResponse,
+    summary="Send an email via Gmail",
+    description="Send an email using the user's connected Gmail account.",
+)
+async def send_email(
+    request: EmailSendRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> EmailSendResponse:
+    """
+    Send an email via the user's connected Gmail account.
+    """
+    from app.services.gmail_service import GmailService
+    from app.chat.service import ChatService
+
+    # Load user credentials
+    service = ChatService(settings, db)
+    credentials = service._load_credentials(user)
+
+    gmail_cred = credentials.get("gmail")
+    if not gmail_cred:
+        return EmailSendResponse(
+            success=False,
+            error="Gmail not connected. Please connect Gmail via Settings > Integrations."
+        )
+
+    # Initialize Gmail service with user credentials
+    gmail_service = GmailService(settings, credential=gmail_cred)
+
+    if not gmail_service.available:
+        return EmailSendResponse(
+            success=False,
+            error="Gmail service not available. Please reconnect Gmail."
+        )
+
+    try:
+        result = await gmail_service.send_email(
+            to=request.to,
+            subject=request.subject,
+            body=request.body,
+            cc=request.cc,
+            bcc=request.bcc,
+        )
+
+        if result.get("success"):
+            logger.info(
+                "email_sent",
+                user_id=str(user.id),
+                to=request.to,
+                message_id=result.get("message_id"),
+            )
+            return EmailSendResponse(
+                success=True,
+                message_id=result.get("message_id"),
+            )
+        else:
+            return EmailSendResponse(
+                success=False,
+                error="Failed to send email"
+            )
+
+    except Exception as e:
+        logger.error("email_send_error", user_id=str(user.id), error=str(e))
+        return EmailSendResponse(
+            success=False,
+            error=str(e)
+        )
+
+
+@router.post(
+    "/email/schedule",
+    response_model=EmailScheduleResponse,
+    summary="Schedule an email to be sent later",
+    description="Schedule an email to be sent at a specific time using the user's connected Gmail account.",
+)
+async def schedule_email(
+    request: EmailScheduleRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> EmailScheduleResponse:
+    """
+    Schedule an email to be sent at a later time.
+    """
+    from app.db.models import ScheduledTask
+
+    # Validate Gmail is connected
+    from app.chat.service import ChatService
+    service = ChatService(settings, db)
+    credentials = service._load_credentials(user)
+
+    gmail_cred = credentials.get("gmail")
+    if not gmail_cred:
+        return EmailScheduleResponse(
+            success=False,
+            error="Gmail not connected. Please connect Gmail via Settings > Integrations."
+        )
+
+    # Create scheduled task
+    try:
+        scheduled_task = ScheduledTask(
+            user_id=user.id,
+            title=f"Email to {request.to}: {request.subject[:50]}",
+            description=f"Scheduled email to {request.to}",
+            task_type="scheduled_email",
+            schedule_type="one_time",
+            scheduled_at=request.scheduled_at,
+            timezone=request.timezone,
+            status="active",
+            next_run_at=request.scheduled_at,
+            task_metadata={
+                "to": request.to,
+                "subject": request.subject,
+                "body": request.body,
+                "cc": request.cc,
+                "bcc": request.bcc,
+            },
+        )
+        db.add(scheduled_task)
+        db.commit()
+        db.refresh(scheduled_task)
+
+        logger.info(
+            "email_scheduled",
+            user_id=str(user.id),
+            task_id=str(scheduled_task.id),
+            to=request.to,
+            scheduled_at=str(request.scheduled_at),
+        )
+
+        return EmailScheduleResponse(
+            success=True,
+            task_id=str(scheduled_task.id),
+            scheduled_at=scheduled_task.scheduled_at,
+        )
+
+    except Exception as e:
+        logger.error("email_schedule_error", user_id=str(user.id), error=str(e))
+        return EmailScheduleResponse(
+            success=False,
+            error=str(e)
+        )
+
+
+@router.get("/email/scheduled", response_model=List[dict])
+async def list_scheduled_emails(
+    status: Optional[str] = Query(None, description="Filter by status: active, completed, cancelled"),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> List[dict]:
+    """
+    List all scheduled emails for the user.
+    """
+    from app.db.models import ScheduledTask
+
+    query = db.query(ScheduledTask).filter(
+        ScheduledTask.user_id == user.id,
+        ScheduledTask.task_type == "scheduled_email",
+    )
+
+    # Filter by status if provided
+    if status:
+        query = query.filter(ScheduledTask.status == status)
+
+    tasks = query.order_by(ScheduledTask.scheduled_at.desc()).all()
+
+    return [
+        {
+            "id": str(task.id),
+            "to": task.task_metadata.get("to"),
+            "subject": task.task_metadata.get("subject"),
+            "body": task.task_metadata.get("body", ""),
+            "scheduled_at": task.scheduled_at.isoformat() if task.scheduled_at else None,
+            "status": task.status,
+            "created_at": task.created_at.isoformat(),
+            "last_run_at": task.last_run_at.isoformat() if task.last_run_at else None,
+            "run_count": task.run_count or 0,
+        }
+        for task in tasks
+    ]
+
+
+@router.delete("/email/scheduled/{task_id}")
+async def cancel_scheduled_email(
+    task_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    """
+    Cancel a scheduled email.
+    """
+    from app.db.models import ScheduledTask
+
+    try:
+        task_uuid = UUID(task_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid task ID")
+
+    task = (
+        db.query(ScheduledTask)
+        .filter(
+            ScheduledTask.id == task_uuid,
+            ScheduledTask.user_id == user.id,
+            ScheduledTask.task_type == "scheduled_email",
+        )
+        .first()
+    )
+
+    if not task:
+        raise HTTPException(status_code=404, detail="Scheduled email not found")
+
+    task.status = "cancelled"
+    db.commit()
+
+    logger.info("scheduled_email_cancelled", user_id=str(user.id), task_id=task_id)
+
+    return {"message": "Scheduled email cancelled", "task_id": task_id}
+
+
+class EmailScheduleUpdateRequest(BaseModel):
+    to: Optional[str] = None
+    subject: Optional[str] = None
+    body: Optional[str] = None
+    scheduled_at: Optional[str] = None
+
+
+@router.put("/email/scheduled/{task_id}")
+async def update_scheduled_email(
+    task_id: str,
+    request: EmailScheduleUpdateRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    """
+    Update a scheduled email (only if still active).
+    """
+    from app.db.models import ScheduledTask
+
+    try:
+        task_uuid = UUID(task_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid task ID")
+
+    task = (
+        db.query(ScheduledTask)
+        .filter(
+            ScheduledTask.id == task_uuid,
+            ScheduledTask.user_id == user.id,
+            ScheduledTask.task_type == "scheduled_email",
+        )
+        .first()
+    )
+
+    if not task:
+        raise HTTPException(status_code=404, detail="Scheduled email not found")
+
+    if task.status != "active":
+        raise HTTPException(status_code=400, detail="Can only edit active scheduled emails")
+
+    # Update metadata
+    metadata = task.task_metadata or {}
+    if request.to is not None:
+        metadata["to"] = request.to
+    if request.subject is not None:
+        metadata["subject"] = request.subject
+    if request.body is not None:
+        metadata["body"] = request.body
+    task.task_metadata = metadata
+
+    # Update scheduled time
+    if request.scheduled_at is not None:
+        try:
+            from datetime import timezone
+            new_scheduled_at = datetime.fromisoformat(request.scheduled_at.replace("Z", "+00:00"))
+            # Make comparison with timezone-aware datetime
+            now_utc = datetime.now(timezone.utc)
+            # If new_scheduled_at is naive, assume UTC
+            if new_scheduled_at.tzinfo is None:
+                new_scheduled_at = new_scheduled_at.replace(tzinfo=timezone.utc)
+            if new_scheduled_at <= now_utc:
+                raise HTTPException(status_code=400, detail="Scheduled time must be in the future")
+            # Store as naive UTC for consistency with database
+            task.scheduled_at = new_scheduled_at.replace(tzinfo=None)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid scheduled_at format")
+
+    db.commit()
+    db.refresh(task)
+
+    logger.info("scheduled_email_updated", user_id=str(user.id), task_id=task_id)
+
+    return {
+        "message": "Scheduled email updated",
+        "task_id": task_id,
+        "id": str(task.id),
+        "to": task.task_metadata.get("to"),
+        "subject": task.task_metadata.get("subject"),
+        "body": task.task_metadata.get("body", ""),
+        "scheduled_at": task.scheduled_at.isoformat() if task.scheduled_at else None,
+        "status": task.status,
+    }
+
+
+@router.get(
+    "/email/{email_id}",
+    summary="Get email details by ID",
+    description="Get full email details including body by Gmail message ID.",
+)
+async def get_email_details(
+    email_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> dict:
+    """
+    Get full email details by Gmail message ID.
+    """
+    from app.services.gmail_service import GmailService
+    from app.chat.service import ChatService
+
+    # Load user credentials
+    service = ChatService(settings, db)
+    credentials = service._load_credentials(user)
+
+    gmail_cred = credentials.get("gmail")
+    if not gmail_cred:
+        raise HTTPException(
+            status_code=400,
+            detail="Gmail not connected. Please connect Gmail via Settings > Integrations."
+        )
+
+    # Initialize Gmail service with user credentials
+    gmail_service = GmailService(settings, credential=gmail_cred)
+
+    if not gmail_service.available:
+        raise HTTPException(
+            status_code=400,
+            detail="Gmail service not available. Please reconnect Gmail."
+        )
+
+    try:
+        email_details = await gmail_service.get_email_by_id(email_id)
+        logger.info(
+            "email_details_fetched",
+            user_id=str(user.id),
+            email_id=email_id,
+        )
+        return email_details
+
+    except Exception as e:
+        logger.error("email_details_error", user_id=str(user.id), email_id=email_id, error=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # =============================================================================

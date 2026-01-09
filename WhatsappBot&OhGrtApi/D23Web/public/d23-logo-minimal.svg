@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none">
+  <defs>
+    <!-- Vibrant gradient -->
+    <linearGradient id="vibrantGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6366F1"/>
+      <stop offset="50%" style="stop-color:#A855F7"/>
+      <stop offset="100%" style="stop-color:#EC4899"/>
+    </linearGradient>
+
+    <!-- Mesh gradient simulation -->
+    <radialGradient id="meshGrad1" cx="30%" cy="30%" r="60%">
+      <stop offset="0%" style="stop-color:#818CF8"/>
+      <stop offset="100%" style="stop-color:transparent"/>
+    </radialGradient>
+
+    <radialGradient id="meshGrad2" cx="80%" cy="80%" r="50%">
+      <stop offset="0%" style="stop-color:#F472B6"/>
+      <stop offset="100%" style="stop-color:transparent"/>
+    </radialGradient>
+
+    <!-- Blur for depth -->
+    <filter id="blur1">
+      <feGaussianBlur stdDeviation="8"/>
+    </filter>
+  </defs>
+
+  <!-- Base shape - squircle -->
+  <rect x="6" y="6" width="108" height="108" rx="32" fill="#0F0F14"/>
+
+  <!-- Gradient background -->
+  <rect x="6" y="6" width="108" height="108" rx="32" fill="url(#vibrantGrad)" opacity="0.9"/>
+
+  <!-- Mesh gradient overlays -->
+  <rect x="6" y="6" width="108" height="108" rx="32" fill="url(#meshGrad1)" opacity="0.5"/>
+  <rect x="6" y="6" width="108" height="108" rx="32" fill="url(#meshGrad2)" opacity="0.4"/>
+
+  <!-- Noise texture overlay -->
+  <rect x="6" y="6" width="108" height="108" rx="32" fill="url(#vibrantGrad)" opacity="0.05" style="mix-blend-mode: overlay"/>
+
+  <!-- Top shine -->
+  <ellipse cx="60" cy="30" rx="40" ry="20" fill="white" opacity="0.1"/>
+
+  <!-- D23 Typography - Bold modern -->
+  <text x="60" y="68" text-anchor="middle" font-family="system-ui, -apple-system, 'Inter', sans-serif" font-size="44" font-weight="900" letter-spacing="-2" fill="white">D23</text>
+
+  <!-- Underline accent -->
+  <rect x="32" y="76" width="56" height="3" rx="1.5" fill="white" opacity="0.4"/>
+
+  <!-- Corner accent dots -->
+  <circle cx="22" cy="22" r="4" fill="white" opacity="0.3"/>
+  <circle cx="98" cy="98" r="4" fill="white" opacity="0.3"/>
+
+  <!-- Floating particles -->
+  <circle cx="92" cy="28" r="2" fill="white" opacity="0.8">
+    <animate attributeName="cy" values="28;24;28" dur="3s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="28" cy="92" r="1.5" fill="white" opacity="0.6">
+    <animate attributeName="cy" values="92;88;92" dur="2.5s" repeatCount="indefinite"/>
+  </circle>
+</svg>

@@ -79,29 +79,12 @@ function LanguageMarquee() {
   )
 }
 
-// ============== MAGNETIC BUTTON ==============
+// ============== MAGNETIC BUTTON (CSS-only) ==============
 function MagneticButton({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  const ref = useRef<HTMLDivElement>(null)
-  const x = useMotionValue(0)
-  const y = useMotionValue(0)
-  const springX = useSpring(x, { stiffness: 300, damping: 20 })
-  const springY = useSpring(y, { stiffness: 300, damping: 20 })
-
-  const handleMouse = (e: React.MouseEvent) => {
-    if (!ref.current) return
-    const rect = ref.current.getBoundingClientRect()
-    const centerX = rect.left + rect.width / 2
-    const centerY = rect.top + rect.height / 2
-    x.set((e.clientX - centerX) * 0.2)
-    y.set((e.clientY - centerY) * 0.2)
-  }
-
-  const reset = () => { x.set(0); y.set(0) }
-
   return (
-    <motion.div ref={ref} onMouseMove={handleMouse} onMouseLeave={reset} style={{ x: springX, y: springY }} className={className}>
+    <div className={cn("relative transition-transform duration-200 hover:scale-105", className)}>
       {children}
-    </motion.div>
+    </div>
   )
 }
 
@@ -123,7 +106,7 @@ function TiltCard({ children, className = "" }: { children: React.ReactNode; cla
   const reset = () => { x.set(0); y.set(0) }
 
   return (
-    <motion.div ref={ref} onMouseMove={handleMouse} onMouseLeave={reset} style={{ rotateX, rotateY, transformStyle: "preserve-3d" }} className={className}>
+    <motion.div ref={ref} onMouseMove={handleMouse} onMouseLeave={reset} style={{ rotateX, rotateY, transformStyle: "preserve-3d", position: "relative" }} className={className}>
       {children}
     </motion.div>
   )
@@ -589,14 +572,11 @@ function Header() {
   }, [])
 
   return (
-    <motion.header initial={{ y: -100 }} animate={{ y: 0 }} transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }} className={cn("fixed top-0 left-0 right-0 z-50 transition-all duration-500", scrolled ? "bg-black/70 backdrop-blur-xl border-b border-white/10" : "")}>
+    <header className={cn("fixed top-0 left-0 right-0 z-50 transition-all duration-500", scrolled ? "bg-black/70 backdrop-blur-xl border-b border-white/10" : "")}>
       <div className="max-w-7xl mx-auto px-6 py-4">
         <div className="flex items-center justify-between">
           <Link href="/" scroll={true} className="flex items-center gap-2 cursor-pointer z-10">
-            <motion.div whileHover={{ rotate: 360 }} transition={{ duration: 0.5 }}>
-              <Image src="/d23-logo.png" alt="D23" width={40} height={40} className="cursor-pointer" />
-            </motion.div>
-            <span className="text-xl font-bold text-white">D23<GradientText>.AI</GradientText></span>
+            <Image src="/d23ai-logo-v7.svg" alt="D23" width={40} height={40} className="cursor-pointer hover:scale-110 transition-transform" priority />
           </Link>
 
           <nav className="hidden md:flex items-center gap-8">
@@ -625,7 +605,7 @@ function Header() {
           </div>
         </div>
       </div>
-    </motion.header>
+    </header>
   )
 }
 
@@ -652,11 +632,11 @@ function HeroSection() {
         <div className="absolute inset-0 opacity-30">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.3),rgba(255,255,255,0))]" />
         </div>
-        <motion.div animate={{ scale: [1, 1.2, 1], x: [0, 50, 0], y: [0, -30, 0] }} transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }} className="absolute top-20 left-[10%] w-[500px] h-[500px] bg-gradient-to-r from-violet-600/40 to-fuchsia-600/40 rounded-full blur-[100px]" />
-        <motion.div animate={{ scale: [1.2, 1, 1.2], x: [0, -40, 0], y: [0, 40, 0] }} transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }} className="absolute bottom-20 right-[10%] w-[400px] h-[400px] bg-gradient-to-r from-cyan-500/30 to-blue-600/30 rounded-full blur-[100px]" />
-        <motion.div animate={{ scale: [1, 1.3, 1], rotate: [0, 180, 360] }} transition={{ duration: 25, repeat: Infinity, ease: "linear" }} className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-gradient-to-r from-pink-500/20 via-violet-500/20 to-cyan-500/20 rounded-full blur-[120px]" />
+        <div className="absolute top-20 left-[10%] w-[500px] h-[500px] bg-gradient-to-r from-violet-600/40 to-fuchsia-600/40 rounded-full blur-[100px] animate-[float1_20s_ease-in-out_infinite]" />
+        <div className="absolute bottom-20 right-[10%] w-[400px] h-[400px] bg-gradient-to-r from-cyan-500/30 to-blue-600/30 rounded-full blur-[100px] animate-[float2_15s_ease-in-out_infinite]" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-gradient-to-r from-pink-500/20 via-violet-500/20 to-cyan-500/20 rounded-full blur-[120px] animate-[spin_25s_linear_infinite]" />
         <div className="absolute inset-0 opacity-[0.015] bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMDAiIGhlaWdodD0iMzAwIj48ZmlsdGVyIGlkPSJhIiB4PSIwIiB5PSIwIj48ZmVUdXJidWxlbmNlIGJhc2VGcmVxdWVuY3k9Ii43NSIgc3RpdGNoVGlsZXM9InN0aXRjaCIgdHlwZT0iZnJhY3RhbE5vaXNlIi8+PGZlQ29sb3JNYXRyaXggdHlwZT0ic2F0dXJhdGUiIHZhbHVlcz0iMCIvPjwvZmlsdGVyPjxwYXRoIGQ9Ik0wIDBoMzAwdjMwMEgweiIgZmlsdGVyPSJ1cmwoI2EpIiBvcGFjaXR5PSIuMDUiLz48L3N2Zz4=')]" />
-        <motion.div animate={{ opacity: [0.03, 0.06, 0.03] }} transition={{ duration: 4, repeat: Infinity }} className="absolute inset-0 bg-[linear-gradient(rgba(139,92,246,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(139,92,246,0.03)_1px,transparent_1px)] bg-[size:60px_60px]" />
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(139,92,246,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(139,92,246,0.03)_1px,transparent_1px)] bg-[size:60px_60px] animate-[pulse_4s_ease-in-out_infinite]" />
         <FloatingParticles />
       </div>
 
@@ -1510,8 +1490,8 @@ function Footer() {
           <div className="absolute bottom-0 right-1/4 w-64 h-64 bg-fuchsia-500/10 rounded-full blur-3xl" />
           <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="flex items-center gap-3">
-              <Image src="/d23-logo.png" alt="D23 AI" width={40} height={40} />
-              <div><p className="text-lg font-bold text-white">D23<GradientText>.AI</GradientText></p><p className="text-sm text-zinc-500">{t.footer.tagline}</p></div>
+              <Image src="/d23ai-logo-v7.svg" alt="D23 AI" width={40} height={40} />
+              <div><p className="text-lg font-bold text-white">D23 <GradientText>AI</GradientText></p><p className="text-sm text-zinc-500">{t.footer.tagline}</p></div>
             </div>
             <MagneticButton><Link href="https://wa.me/918548819349?text=Hey%20D23%20AI%21%20What%20can%20you%20do%3F" target="_blank" className="flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white font-medium shadow-lg shadow-violet-500/25">{t.footer.button}</Link></MagneticButton>
           </div>
@@ -1536,15 +1516,17 @@ function PageContent() {
   if (!hydrated) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
-        <div className="animate-pulse"><Image src="/d23-logo.png" alt="D23" width={80} height={80} /></div>
+        <div className="animate-pulse"><Image src="/d23ai-logo-v7.svg" alt="D23" width={80} height={80} priority /></div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-black text-white overflow-x-hidden">
-      <Header />
-      <main>
+    <div className="relative min-h-screen bg-black text-white overflow-x-hidden">
+      <div className="relative">
+        <Header />
+      </div>
+      <main className="relative">
         <HeroSection />
         <LanguageMarquee />
         <AnimatedDemoShowcase />

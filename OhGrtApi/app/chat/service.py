@@ -71,6 +71,7 @@ class ChatService:
         intent = None
         structured_data = None
         media_url = None
+        requires_location = False
         try:
             agent = build_tool_agent(self.settings, credentials=credentials, db=self.db, user_id=user.id)
             result = await agent.invoke(message, allowed_tools=allowed_tools)
@@ -79,6 +80,7 @@ class ChatService:
             intent = result.get("intent") or result.get("category", "chat")
             structured_data = result.get("structured_data")
             media_url = result.get("media_url")
+            requires_location = result.get("requires_location", False)
             ai_message_metadata = {
                 "category": result.get("category", "chat"),
                 "route_log": ", ".join(route_log) if isinstance(route_log, list) else str(route_log),
@@ -92,6 +94,7 @@ class ChatService:
         # Store assistant message with structured data in metadata
         ai_message_metadata["structured_data"] = structured_data
         ai_message_metadata["media_url"] = media_url
+        ai_message_metadata["requires_location"] = requires_location
         assistant_msg = ChatMessage(
             user_id=user.id,
             conversation_id=conversation_id,
@@ -273,9 +276,19 @@ class ChatService:
             try:
                 # Decrypt the access token before returning
                 decrypted_token = decrypt_if_needed(cred.access_token) if cred.access_token else None
+
+                # Decrypt sensitive config values (like refresh_token)
+                config = dict(cred.config) if cred.config else {}
+                if config.get("refresh_token"):
+                    try:
+                        config["refresh_token"] = decrypt_if_needed(config["refresh_token"])
+                    except ValueError:
+                        # If decryption fails, keep original (may not be encrypted)
+                        pass
+
                 cred_map[cred.provider] = {
                     "access_token": decrypted_token,
-                    "config": cred.config or {},
+                    "config": config,
                     "display_name": cred.display_name,
                 }
             except ValueError as e:

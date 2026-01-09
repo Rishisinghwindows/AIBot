@@ -1,0 +1,23 @@
+{
+  "hero": {
+    "title": "Join our team",
+    "subtitle": "Join us in building India's most helpful AI — in every language, for every need."
+  },
+  "openRoles": {
+    "title": "Open roles",
+    "positions": [
+      {
+        "id": 1,
+        "title": "AI Engineer",
+        "location": "Remote",
+        "applyUrl": "#"
+      },
+      {
+        "id": 2,
+        "title": "Growth Magician",
+        "location": "Remote",
+        "applyUrl": "#"
+      }
+    ]
+  }
+}
