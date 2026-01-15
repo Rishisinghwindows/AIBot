@@ -59,13 +59,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log("[Auth] Backend auth response status:", authResponse.status);
 
       if (!authResponse.ok) {
+        const errorText = await authResponse.text();
         // If backend doesn't have auth endpoints (404), continue without backend auth
         if (authResponse.status === 404) {
           console.warn("[Auth] Backend auth endpoint not available, continuing without backend auth");
           profileFetched.current = true;
           return;
         }
-        const errorText = await authResponse.text();
+        // If backend rejects Firebase token, continue without backend auth
+        if (authResponse.status === 401) {
+          console.warn("[Auth] Backend auth rejected Firebase token, continuing without backend auth");
+          console.warn("[Auth] Backend auth error:", errorText);
+          profileFetched.current = true;
+          return;
+        }
         console.error("[Auth] Backend auth failed:", errorText);
         throw new Error(`Failed to authenticate with backend: ${errorText}`);
       }

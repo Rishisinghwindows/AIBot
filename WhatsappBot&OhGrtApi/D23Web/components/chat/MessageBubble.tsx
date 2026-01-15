@@ -416,7 +416,7 @@ function FormattedMessage({ content }: { content: string }) {
                 {part.content}
               </code>
             ) : (
-              <span key={i}>{formatText(part.content)}</span>
+              <span key={i}>{renderTextWithLinks(part.content)}</span>
             )
           )}
         </>
@@ -447,7 +447,7 @@ function FormattedMessage({ content }: { content: string }) {
             </div>
           );
         }
-        return <span key={i}>{formatText(part.content)}</span>;
+        return <span key={i}>{renderTextWithLinks(part.content)}</span>;
       })}
     </>
   );
@@ -481,10 +481,47 @@ function CopyCodeButton({ code }: { code: string }) {
   );
 }
 
-function formatText(content: string): string {
+function renderTextWithLinks(content: string) {
   // Convert WhatsApp-style bold markers to clean text for display
   // The rich cards handle the formatting, so we just clean up the text
-  return content.replace(/\*([^*]+)\*/g, "$1");
+  const cleaned = content.replace(/\*([^*]+)\*/g, "$1");
+  const urlRegex = /https?:\/\/[^\s)]+/g;
+  const parts: Array<string | { url: string }> = [];
+  let lastIndex = 0;
+  let match;
+
+  while ((match = urlRegex.exec(cleaned)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(cleaned.slice(lastIndex, match.index));
+    }
+    parts.push({ url: match[0] });
+    lastIndex = match.index + match[0].length;
+  }
+
+  if (lastIndex < cleaned.length) {
+    parts.push(cleaned.slice(lastIndex));
+  }
+
+  return (
+    <>
+      {parts.map((part, idx) => {
+        if (typeof part === "string") {
+          return <span key={idx}>{part}</span>;
+        }
+        return (
+          <a
+            key={idx}
+            href={part.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline text-blue-400 hover:text-blue-300"
+          >
+            {part.url}
+          </a>
+        );
+      })}
+    </>
+  );
 }
 
 function formatTime(date: Date): string {
