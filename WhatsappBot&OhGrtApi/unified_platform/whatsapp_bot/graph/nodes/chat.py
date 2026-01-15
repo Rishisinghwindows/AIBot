@@ -12,6 +12,11 @@ from langchain_core.prompts import ChatPromptTemplate
 
 from whatsapp_bot.state import BotState
 from whatsapp_bot.config import settings
+from whatsapp_bot.conversation_manager import (
+    ConversationState,
+    get_conversation_manager,
+)
+from whatsapp_bot.graph.context_cache import get_context as get_followup_context
 from common.utils.response_formatter import sanitize_error
 from common.i18n.constants import LANGUAGE_NAMES
 from common.i18n.responses import get_chat_label
@@ -69,7 +74,95 @@ def get_language_instruction(lang_code: str) -> tuple:
     return lang_info.get("en", "English"), lang_code
 
 
-def handle_chat(state: BotState) -> dict:
+def _should_use_followup_context(message: str) -> bool:
+    """Heuristic check for follow-up queries that need prior context."""
+    msg = message.lower().strip()
+    if len(msg) <= 60:
+        return True
+    followup_phrases = [
+        "also", "and", "what about", "about", "tell", "more", "details",
+        "all", "list", "explain", "pls", "please",
+    ]
+    return any(phrase in msg for phrase in followup_phrases)
+
+
+def _is_alternate_route_followup(message: str) -> bool:
+    """Detect short follow-ups asking for alternate routes."""
+    msg = message.lower().strip()
+    phrases = [
+        "other route",
+        "another route",
+        "alternate route",
+        "alternative route",
+        "different route",
+        "second route",
+        "aur route",
+        "kuch aur route",
+        "koi aur route",
+        "dusra route",
+        "doosra route",
+        "aur rasta",
+        "kuch aur rasta",
+        "koi aur rasta",
+        "dusra rasta",
+        "doosra rasta",
+        "alternate rasta",
+        "alternative rasta",
+    ]
+    return any(phrase in msg for phrase in phrases)
+
+
+def _is_confirmation(message: str) -> bool:
+    msg = message.lower().strip()
+    confirmations = {
+        "yes", "y", "yeah", "yep", "sure", "ok", "okay", "pls", "please",
+        "pls do", "please do", "ha", "haan", "ji", "theek", "thik", "bilkul",
+    }
+    return msg in confirmations
+
+
+def _is_full_text_request(message: str) -> bool:
+    msg = message.lower().strip()
+    triggers = [
+        "full text", "complete text", "entire text", "full version",
+        "पूरा पाठ", "पूरा टेक्स्ट", "फुल टेक्स्ट", "पूरा",
+    ]
+    return any(t in msg for t in triggers)
+
+
+def _is_confirmation(message: str) -> bool:
+    msg = message.lower().strip()
+    confirmations = {
+        "yes", "y", "yeah", "yep", "sure", "ok", "okay", "pls", "please",
+        "pls do", "please do", "ha", "haan", "ji", "theek", "thik", "bilkul",
+    }
+    return msg in confirmations
+
+
+def _is_hanuman_chalisa_request(text: str) -> bool:
+    if not text:
+        return False
+    return "hanuman chalisa" in text.lower() or "हनुमान चालीसा" in text
+
+
+def _hanuman_chalisa_response(lang: str) -> str:
+    if lang == "hi":
+        return (
+            "🚩 *हनुमान चालीसा (टेक्स्ट)* 🚩\n"
+            "यहाँ पूरा पाठ देखने/कॉपी करने के लिए:\n"
+            "https://hi.wikipedia.org/wiki/हनुमान_चालीसा\n\n"
+            "श्रीगुरु चरन सरोज रज, निज मन मुकुरु सुधारि।\n"
+            "बरनउँ रघुबर बिमल जसु, जो दायकु फल चारि॥\n"
+            "बुद्धिहीन तनु जानिके, सुमिरौं पवन कुमार।\n"
+            "बल बुद्धि विद्या देहु मोहि, हरहु कलेस विकार॥"
+        )
+    return (
+        "Here is the Hanuman Chalisa text (Hindi):\n"
+        "https://hi.wikipedia.org/wiki/हनुमान_चालीसा"
+    )
+
+
+async def handle_chat(state: BotState) -> dict:
     """
     Node function: Handle general chat messages.
     Responds in the user's detected language.
@@ -84,6 +177,7 @@ def handle_chat(state: BotState) -> dict:
         state.get("current_query", "")
         or state["whatsapp_message"].get("text", "")
     )
+    phone = state.get("whatsapp_message", {}).get("from_number", "")
 
     # Get detected language (default to English)
     detected_lang = state.get("detected_language", "en")
@@ -101,19 +195,81 @@ def handle_chat(state: BotState) -> dict:
         }
 
     try:
+        last_query = ""
+        try:
+            manager = get_conversation_manager()
+            existing_context = await manager.get_context(phone) if phone else None
+            context_data = existing_context.get("data", {}) if existing_context else {}
+            last_query = (context_data.get("last_user_query") or "").strip()
+        except Exception:
+            cached = get_followup_context(phone) if phone else None
+            last_query = (cached or {}).get("last_user_query", "").strip()
+
+        if _is_confirmation(user_message) and _is_hanuman_chalisa_request(last_query):
+            response_text = _hanuman_chalisa_response(detected_lang)
+            if phone:
+                await manager.set_context(
+                    phone=phone,
+                    state=ConversationState.IDLE,
+                    data={
+                        "last_user_query": user_message,
+                        "last_bot_response": response_text,
+                    },
+                    intent=INTENT,
+                )
+            return {
+                "response_text": response_text,
+                "response_type": "text",
+                "should_fallback": False,
+                "intent": INTENT,
+            }
+
+        prompt_message = user_message
+        if last_query and _should_use_followup_context(user_message):
+            if _is_alternate_route_followup(user_message):
+                prompt_message = (
+                    f"Previous question: {last_query}\n"
+                    f"Current question: {user_message}\n"
+                    "Instruction: Provide alternate routes/options for the same trip. "
+                    "Do not ask for clarification unless critical details are missing."
+                )
+            elif _is_confirmation(user_message) or _is_full_text_request(user_message):
+                prompt_message = (
+                    f"Previous question: {last_query}\n"
+                    f"Current question: {user_message}\n"
+                    "Instruction: Treat this as a confirmation/follow-up to the previous request. "
+                    "Provide the full response without asking extra clarification."
+                )
+            else:
+                prompt_message = (
+                    f"Previous question: {last_query}\n"
+                    f"Current question: {user_message}"
+                )
+
         llm = ChatOpenAI(
-            model=settings.OPENAI_MODEL,
+            model=settings.openai_model,
             temperature=0.7,
-            api_key=settings.OPENAI_API_KEY,
+            api_key=settings.openai_api_key,
         )
         chain = CHAT_PROMPT | llm
 
         # Include language info in the prompt
         response = chain.invoke({
-            "message": user_message,
+            "message": prompt_message,
             "language_name": language_name,
             "language_code": language_code,
         })
+
+        if phone:
+            await manager.set_context(
+                phone=phone,
+                state=ConversationState.IDLE,
+                data={
+                    "last_user_query": user_message,
+                    "last_bot_response": response.content,
+                },
+                intent=INTENT,
+            )
 
         return {
             "response_text": response.content,

@@ -171,6 +171,7 @@ def extract_message(payload: WebhookPayload) -> Optional[dict]:
             for msg in value.messages:
                 # Get text content
                 text = None
+                caption = None
                 if msg.type == "text":
                     text = msg.text.body
                 elif msg.interactive:
@@ -178,6 +179,14 @@ def extract_message(payload: WebhookPayload) -> Optional[dict]:
                         text = msg.interactive.button_reply.title
                     elif msg.interactive.list_reply:
                         text = msg.interactive.list_reply.title
+                elif msg.type == "image" and msg.image:
+                    caption = msg.image.caption
+                    if caption:
+                        text = caption
+                elif msg.type == "document" and msg.document:
+                    caption = msg.document.caption
+                    if caption:
+                        text = caption
 
                 # Get media ID if present
                 media_id = None
@@ -206,6 +215,7 @@ def extract_message(payload: WebhookPayload) -> Optional[dict]:
                     "message_type": msg.type,
                     "text": text,
                     "media_id": media_id,
+                    "caption": caption,
                     "location": location_data,
                 }
 

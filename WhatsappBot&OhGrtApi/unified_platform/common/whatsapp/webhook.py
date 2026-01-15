@@ -317,13 +317,35 @@ async def process_and_respond(message: dict):
                 text=response_text,
                 reply_to=message["message_id"],
             )
-        elif response_type == "image" and result.get("response_media_url"):
-            await client.send_image_message(
-                to=message["from_number"],
-                image_url=result["response_media_url"],
-                caption=response_text,
-                reply_to=message["message_id"],
-            )
+        elif response_type == "image":
+            media_bytes = result.get("response_media_bytes")
+            if media_bytes:
+                mime_type = result.get("response_media_mime", "image/jpeg")
+                media_id = await client.upload_media(media_bytes, mime_type=mime_type)
+                if media_id:
+                    await client.send_image_message(
+                        to=message["from_number"],
+                        image_id=media_id,
+                        caption=response_text,
+                        reply_to=message["message_id"],
+                    )
+                else:
+                    logger.error("Image upload failed; falling back to text response.")
+                    if response_text:
+                        await client.send_text_message(
+                            to=message["from_number"],
+                            text=response_text,
+                            reply_to=message["message_id"],
+                        )
+            elif result.get("response_media_url"):
+                await client.send_image_message(
+                    to=message["from_number"],
+                    image_url=result["response_media_url"],
+                    caption=response_text,
+                    reply_to=message["message_id"],
+                )
+            else:
+                logger.warning("Image response missing media URL/bytes.")
         elif response_type == "location_request" and response_text:
             # Send interactive location request message
             logger.info(f"Sending location request to {message['from_number']}")

@@ -12,6 +12,7 @@ from typing import Dict, Optional, Tuple
 
 from common.graph.state import BotState
 from common.i18n.responses import get_reminder_label, get_phrase
+from whatsapp_bot.stores.pending_reminder_store import get_pending_reminder_store
 
 logger = logging.getLogger(__name__)
 
@@ -54,8 +55,11 @@ def parse_time_expression(text: str) -> Optional[Tuple[datetime, str]]:
 
         return reminder_time, reminder_text or "Reminder"
 
-    # Pattern: "remind me at X:XX"
-    time_match = re.search(r'at\s+(\d{1,2}):?(\d{2})?\s*(am|pm)?', text_lower)
+    # Pattern: "remind me at/for/in X pm" or "set it for 6:05 pm"
+    time_match = re.search(
+        r'(?:\b(?:at|for|by|around|on|in)\b\s*)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b',
+        text_lower
+    )
     if time_match:
         hour = int(time_match.group(1))
         minute = int(time_match.group(2) or 0)
@@ -72,11 +76,35 @@ def parse_time_expression(text: str) -> Optional[Tuple[datetime, str]]:
         if reminder_time < now:
             reminder_time += timedelta(days=1)
 
-        # Extract reminder text
+        time_phrase = time_match.group(0)
+        reminder_text = text_lower.replace(time_phrase, "")
         reminder_text = re.sub(
-            r'remind\s*me\s*(to\s*)?|at\s+\d{1,2}:?\d*\s*(am|pm)?',
+            r'(?:set\s*(?:a\s*)?reminder|remind\s*me|set\s*it)\s*(?:for|to|about)?',
             '',
-            text_lower
+            reminder_text
+        ).strip()
+
+        return reminder_time, reminder_text or "Reminder"
+
+    # Pattern: 24-hour time like "18:05" (assume today if in future)
+    time_match_24h = re.search(
+        r'(?:\b(?:at|for|by|around|on|in)\b\s*)?([01]?\d|2[0-3]):([0-5]\d)\b',
+        text_lower
+    )
+    if time_match_24h:
+        hour = int(time_match_24h.group(1))
+        minute = int(time_match_24h.group(2))
+
+        reminder_time = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        if reminder_time < now:
+            reminder_time += timedelta(days=1)
+
+        time_phrase = time_match_24h.group(0)
+        reminder_text = text_lower.replace(time_phrase, "")
+        reminder_text = re.sub(
+            r'(?:set\s*(?:a\s*)?reminder|remind\s*me|set\s*it)\s*(?:for|to|about)?',
+            '',
+            reminder_text
         ).strip()
 
         return reminder_time, reminder_text or "Reminder"
@@ -109,13 +137,50 @@ async def handle_reminder(state: BotState) -> Dict:
         State update
     """
     query = state.get("current_query", "")
-    user_phone = state.get("user_phone", "")
+    whatsapp_message = state.get("whatsapp_message", {})
+    user_phone = whatsapp_message.get("from_number", "") or state.get("user_phone", "")
     detected_lang = state.get("detected_language", "en")
+
+    pending_store = get_pending_reminder_store()
+    pending = await pending_store.peek_pending(user_phone) if user_phone else None
 
     # Parse the time expression
     parsed = parse_time_expression(query)
 
+    if pending:
+        pending_text = (pending.get("reminder_text") or "").strip()
+
+        if parsed:
+            reminder_time, reminder_text = parsed
+            if pending_text:
+                reminder_text = pending_text
+            await pending_store.clear_pending(user_phone)
+            parsed = (reminder_time, reminder_text)
+        else:
+            if pending_text:
+                when_to_remind = get_reminder_label("when_to_remind", detected_lang)
+                return {
+                    "response_text": when_to_remind,
+                    "response_type": "text",
+                    "should_fallback": False,
+                    "intent": INTENT,
+                    "route_log": state.get("route_log", []) + ["reminder:missing_time"],
+                }
+
+            if query:
+                await pending_store.save_pending(user_phone, query)
+                when_to_remind = get_reminder_label("when_to_remind", detected_lang)
+                return {
+                    "response_text": when_to_remind,
+                    "response_type": "text",
+                    "should_fallback": False,
+                    "intent": INTENT,
+                    "route_log": state.get("route_log", []) + ["reminder:missing_time"],
+                }
+
     if not parsed:
+        if user_phone:
+            await pending_store.save_pending(user_phone, "")
         what_to_remind = get_reminder_label("what_to_remind", detected_lang)
         return {
             "response_text": what_to_remind,

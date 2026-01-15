@@ -27,6 +27,7 @@ IntentType = Literal[
     "db_query",
     "set_reminder",
     "get_news",
+    "stock_price",
     # Astrology intents
     "get_horoscope",
     "birth_chart",

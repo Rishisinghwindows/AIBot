@@ -8,6 +8,7 @@ Wrapper for OpenWeather API.
 
 import httpx
 import logging
+from datetime import datetime, timedelta
 from common.graph.state import ToolResult
 from common.config.settings import settings
 
@@ -20,6 +21,25 @@ OPENWEATHER_REVERSE_GEO_URL = "http://api.openweathermap.org/geo/1.0/reverse"
 
 # Nominatim for better local names
 NOMINATIM_REVERSE_URL = "https://nominatim.openstreetmap.org/reverse"
+
+CITY_ALIASES = {
+    "rameshwaram": "rameswaram",
+}
+
+
+def _normalize_city_alias(city: str) -> str:
+    if not city:
+        return ""
+    key = city.strip().lower()
+    return CITY_ALIASES.get(key, city)
+
+
+def _format_local_time(timestamp: int, timezone_offset: int) -> str:
+    try:
+        dt = datetime.utcfromtimestamp(timestamp) + timedelta(seconds=timezone_offset)
+        return dt.strftime("%I:%M %p").lstrip("0")
+    except Exception:
+        return ""
 
 
 def _get_local_area_name(latitude: float, longitude: float, client: httpx.Client) -> str:
@@ -179,6 +199,8 @@ def get_weather_by_coordinates(latitude: float, longitude: float) -> ToolResult:
             main = data.get("main", {})
             weather = data.get("weather", [{}])[0]
             wind = data.get("wind", {})
+            sys = data.get("sys", {})
+            timezone_offset = data.get("timezone", 0)
 
             weather_id = weather.get("id", 0)
             description, emoji = _get_weather_description(weather_id)
@@ -205,6 +227,8 @@ def get_weather_by_coordinates(latitude: float, longitude: float) -> ToolResult:
                     "wind_speed": f"{wind.get('speed', 'N/A')} m/s",
                     "pressure": f"{main.get('pressure', 'N/A')} hPa",
                     "visibility": f"{data.get('visibility', 0) / 1000:.1f} km",
+                    "sunrise": _format_local_time(sys.get("sunrise", 0), timezone_offset),
+                    "sunset": _format_local_time(sys.get("sunset", 0), timezone_offset),
                     "weather_id": weather_id,
                     "latitude": latitude,
                     "longitude": longitude,
@@ -263,6 +287,8 @@ def get_weather(city: str) -> ToolResult:
             tool_name="weather",
         )
 
+    city = _normalize_city_alias(city)
+
     api_key = settings.OPENWEATHER_API_KEY
     if not api_key:
         return ToolResult(
@@ -285,6 +311,22 @@ def get_weather(city: str) -> ToolResult:
             )
 
             if response.status_code == 404:
+                # Fallback: try geocoding for near-match
+                geo_response = client.get(
+                    OPENWEATHER_GEO_URL,
+                    params={
+                        "q": city,
+                        "limit": 1,
+                        "appid": api_key,
+                    },
+                )
+                if geo_response.status_code == 200:
+                    geo_data = geo_response.json() or []
+                    if geo_data:
+                        lat = geo_data[0].get("lat")
+                        lon = geo_data[0].get("lon")
+                        if lat is not None and lon is not None:
+                            return get_weather_by_coordinates(lat, lon)
                 return ToolResult(
                     success=False,
                     data=None,
@@ -299,6 +341,8 @@ def get_weather(city: str) -> ToolResult:
             main = data.get("main", {})
             weather = data.get("weather", [{}])[0]
             wind = data.get("wind", {})
+            sys = data.get("sys", {})
+            timezone_offset = data.get("timezone", 0)
 
             weather_id = weather.get("id", 0)
             description, emoji = _get_weather_description(weather_id)
@@ -321,6 +365,8 @@ def get_weather(city: str) -> ToolResult:
                     "wind_speed": f"{wind.get('speed', 'N/A')} m/s",
                     "pressure": f"{main.get('pressure', 'N/A')} hPa",
                     "visibility": f"{data.get('visibility', 0) / 1000:.1f} km",
+                    "sunrise": _format_local_time(sys.get("sunrise", 0), timezone_offset),
+                    "sunset": _format_local_time(sys.get("sunset", 0), timezone_offset),
                     "weather_id": weather_id,
                 },
                 error=None,

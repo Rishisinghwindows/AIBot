@@ -37,7 +37,12 @@ def _parse_articles(data: dict) -> list:
     return articles
 
 
-async def get_news(query: Optional[str] = None, category: Optional[str] = None, country: str = "in") -> ToolResult:
+async def get_news(
+    query: Optional[str] = None,
+    category: Optional[str] = None,
+    country: str = "in",
+    language: Optional[str] = None,
+) -> ToolResult:
     """
     Get top news headlines from NewsAPI.
 
@@ -91,8 +96,11 @@ async def get_news(query: Optional[str] = None, category: Optional[str] = None, 
                     "apiKey": settings.NEWS_API_KEY,
                     "q": search_query,
                     "sortBy": "publishedAt",
-                    "language": "en",
                 }
+                if language and len(language) == 2:
+                    params["language"] = language
+                else:
+                    params["language"] = "en"
 
                 response = await client.get(EVERYTHING_URL, params=params)
                 response.raise_for_status()
@@ -102,6 +110,9 @@ async def get_news(query: Optional[str] = None, category: Optional[str] = None, 
                     articles = _parse_articles(data)
 
             if not articles:
+                fallback = await _fallback_to_serper(query=query, category=category, country=country)
+                if fallback["success"]:
+                    return fallback
                 return ToolResult(
                     success=True,
                     data={"articles": []},

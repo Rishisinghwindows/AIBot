@@ -60,6 +60,13 @@ except ImportError as e:
     GRAPH_AVAILABLE = False
     graph_router = None
 
+try:
+    from ohgrt_api.admin.router import router as admin_router
+    ADMIN_AVAILABLE = True
+except ImportError as e:
+    ADMIN_AVAILABLE = False
+    admin_router = None
+
 # Import middleware (with fallback for compatibility)
 try:
     from ohgrt_api.middleware import (
@@ -116,6 +123,13 @@ async def lifespan(app: FastAPI):
             logger.warning(f"Could not start reminder service: {e}")
 
         try:
+            from whatsapp_bot.services.reminder_service import get_reminder_service
+            get_reminder_service().start_scheduler()
+            logger.info("WhatsApp reminder scheduler started")
+        except Exception as e:
+            logger.warning(f"Could not start WhatsApp reminder service: {e}")
+
+        try:
             from common.services.horoscope_scheduler import start_horoscope_scheduler
             from common.services.transit_service import start_transit_service
             await start_horoscope_scheduler()
@@ -143,6 +157,12 @@ async def lifespan(app: FastAPI):
         try:
             from common.services.reminder_service import ReminderService
             ReminderService.shutdown_scheduler()
+        except Exception:
+            pass
+
+        try:
+            from whatsapp_bot.services.reminder_service import get_reminder_service
+            get_reminder_service().stop_scheduler()
         except Exception:
             pass
 
@@ -243,6 +263,9 @@ if WEB_AVAILABLE and web_router:
 
 if GRAPH_AVAILABLE and graph_router:
     app.include_router(graph_router)  # /graph/*
+
+if ADMIN_AVAILABLE and admin_router:
+    app.include_router(admin_router)  # /admin/*
 
 
 @app.get("/")

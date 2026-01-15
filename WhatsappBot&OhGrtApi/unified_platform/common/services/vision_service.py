@@ -12,6 +12,8 @@ import os
 import io
 from typing import Optional
 
+from common.i18n.detector import get_language_name
+
 logger = logging.getLogger(__name__)
 
 
@@ -130,7 +132,8 @@ class VisionService:
                 "Extract ALL text visible in this image. "
                 "Preserve the layout and formatting as much as possible. "
                 "If there are multiple text sections, separate them clearly. "
-                "Only output the extracted text, no descriptions."
+                "Only output the extracted text, no descriptions. "
+                "Text may be in regional scripts (e.g., Kannada, Hindi, Tamil)."
             ),
             "objects": (
                 "List all objects, items, and elements visible in this image. "
@@ -165,6 +168,22 @@ class VisionService:
             ),
         }
         return prompts.get(analysis_type, prompts["describe"])
+
+    def _apply_language_instruction(
+        self,
+        prompt: str,
+        response_language: Optional[str],
+        analysis_type: str,
+    ) -> str:
+        """Attach language instruction to prompt when appropriate."""
+        if not response_language:
+            return prompt
+        if analysis_type == "ocr":
+            return (
+                f"{prompt}\n\nDo not translate. Preserve the original text language and formatting."
+            )
+        language_name = get_language_name(response_language, display_in="en")
+        return f"{prompt}\n\nRespond in {language_name}."
 
     async def _analyze_with_dashscope(
         self, image_bytes: bytes, prompt: str
@@ -284,7 +303,9 @@ class VisionService:
         self,
         image_bytes: bytes,
         prompt: Optional[str] = None,
-        analysis_type: str = "describe"
+        analysis_type: str = "describe",
+        response_language: Optional[str] = None,
+        max_size: int = 1024,
     ) -> Optional[str]:
         """
         Analyze an image and return description/analysis.
@@ -298,10 +319,13 @@ class VisionService:
             Analysis result text or None if failed
         """
         system_prompt = self._get_prompt(analysis_type, prompt)
+        system_prompt = self._apply_language_instruction(
+            system_prompt, response_language, analysis_type
+        )
 
         # Resize image to prevent Ollama crashes with large WhatsApp images
         logger.info(f"Original image size: {len(image_bytes)} bytes")
-        processed_bytes = resize_image_for_model(image_bytes, max_size=1024)
+        processed_bytes = resize_image_for_model(image_bytes, max_size=max_size)
         logger.info(f"Processed image size: {len(processed_bytes)} bytes")
 
         # Try DashScope (Qwen VL API) first
@@ -344,14 +368,43 @@ class VisionService:
         """Identify food items in the image."""
         return await self.analyze_image(image_bytes, analysis_type="food")
 
-    async def custom_query(self, image_bytes: bytes, question: str) -> Optional[str]:
+    async def custom_query(
+        self,
+        image_bytes: bytes,
+        question: str,
+        response_language: Optional[str] = None,
+    ) -> Optional[str]:
         """Ask a custom question about the image."""
-        prompt = f"Look at this image and answer: {question}"
-        return await self.analyze_image(image_bytes, prompt=prompt)
+        prompt = (
+            "First, extract any visible text exactly as it appears (no translation). "
+            "If no text is present, say 'No visible text found'. "
+            f"Then answer the user's question: {question}"
+        )
+        return await self.analyze_image(
+            image_bytes,
+            prompt=prompt,
+            response_language=response_language,
+        )
 
     async def is_available(self) -> bool:
         """Check if vision service is available."""
-        return bool(self.dashscope_api_key) or bool(self.ollama_model)
+        if self.dashscope_api_key:
+            return True
+        if self.ollama_model:
+            return True
+        # Try to detect a local Ollama vision model
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                response = await client.get(f"{OLLAMA_BASE_URL}/api/tags")
+                if response.status_code == 200:
+                    models = [m["name"] for m in response.json().get("models", [])]
+                    for m in ["qwen2.5vl:7b", "qwen3-vl:8b", "moondream:latest", "llava"]:
+                        if m in models:
+                            self.ollama_model = m
+                            return True
+        except Exception as e:
+            logger.warning(f"Vision availability check failed: {e}")
+        return False
 
 
 # Singleton instance

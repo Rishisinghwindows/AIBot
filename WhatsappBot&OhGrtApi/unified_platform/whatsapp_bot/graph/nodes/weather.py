@@ -13,6 +13,7 @@ import re
 from whatsapp_bot.state import BotState
 from whatsapp_bot.config import settings
 from common.tools.weather_api import get_weather, get_weather_by_coordinates
+from common.tools.serper_search import search_google
 from common.utils.response_formatter import sanitize_error, create_service_error_response
 from whatsapp_bot.stores.pending_location_store import get_pending_location_store
 from bot.whatsapp.client import get_whatsapp_client
@@ -261,6 +262,60 @@ def _format_weather_response(data: dict, lang: str = "en") -> str:
     return "\n".join(response_lines)
 
 
+def _format_weather_narrative_hi(data: dict, sources: list) -> str:
+    location = data.get("location", "").strip() or "इस स्थान"
+    description = data.get("description", "").lower()
+    temp = data.get("temperature", "N/A")
+    feels_like = data.get("feels_like", "")
+    humidity = data.get("humidity", "")
+    wind_speed = data.get("wind_speed", "")
+    visibility = data.get("visibility", "")
+    sunrise = data.get("sunrise", "")
+    sunset = data.get("sunset", "")
+
+    lines = [
+        f"आज {location} में मौसम {description} है। तापमान लगभग {temp} है।",
+    ]
+    if feels_like:
+        lines[-1] = f"{lines[-1].rstrip('।')} और महसूस तापमान लगभग {feels_like} है।"
+    if humidity:
+        lines.append(f"नमी लगभग {humidity} है।")
+    if wind_speed:
+        lines.append(f"हवा की गति {wind_speed} के आसपास है।")
+    if visibility and visibility != "0.0 km":
+        lines.append(f"दृश्यता {visibility} तक है।")
+    if sunrise and sunset:
+        lines.append(f"सूर्योदय सुबह {sunrise} बजे और सूर्यास्त शाम {sunset} बजे होगा।")
+    elif sunset:
+        lines.append(f"सूर्यास्त शाम {sunset} बजे होगा।")
+    elif sunrise:
+        lines.append(f"सूर्योदय सुबह {sunrise} बजे होगा।")
+
+    lines.append("")
+    lines.append("अगर आप बाहर जाने की योजना बना रहे हैं, तो मौसम के अनुसार कपड़े पहनें।")
+
+    if sources:
+        source_links = []
+        for idx, item in enumerate(sources[:3], start=1):
+            link = item.get("link") or ""
+            if link:
+                source_links.append(f"स्रोत {idx} [ {link} ]")
+        if source_links:
+            lines.append("")
+            lines.append(" | ".join(source_links))
+            lines.append("")
+            lines.append("powered by web-search")
+
+    return "\n".join(lines)
+
+
+async def _format_weather_response_hi(data: dict, city: str) -> str:
+    search_query = f"{city} weather today"
+    sources_result = await search_google(query=search_query, max_results=5, country="in", locale="en")
+    sources = (sources_result.get("data") or {}).get("results", []) if sources_result.get("success") else []
+    return _format_weather_narrative_hi(data, sources)
+
+
 async def _format_weather_response_ai(data: dict, lang: str = "en") -> str:
     """
     Format weather data with AI-based translation for non-English languages.
@@ -389,8 +444,11 @@ async def handle_weather(state: BotState) -> dict:
 
         if result["success"]:
             data = result["data"]
-            # Use AI-based translation for non-English responses
-            response_text = await _format_weather_response_ai(data, detected_lang)
+            if detected_lang == "hi":
+                response_text = await _format_weather_response_hi(data, city)
+            else:
+                # Use AI-based translation for non-English responses
+                response_text = await _format_weather_response_ai(data, detected_lang)
             return {
                 "tool_result": result,
                 "response_text": response_text,
@@ -438,8 +496,11 @@ async def _execute_weather_with_coordinates(latitude: float, longitude: float, l
 
         if result["success"]:
             data = result["data"]
-            # Use AI-based translation for non-English responses
-            response_text = await _format_weather_response_ai(data, lang)
+            if lang == "hi":
+                response_text = await _format_weather_response_hi(data, data.get("location", ""))
+            else:
+                # Use AI-based translation for non-English responses
+                response_text = await _format_weather_response_ai(data, lang)
             return {
                 "tool_result": result,
                 "response_text": response_text,

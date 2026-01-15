@@ -85,6 +85,7 @@ DOMAIN_KEYWORDS = {
     "utility": [
         "weather", "temperature", "forecast", "rain", "sunny",
         "news", "headlines", "latest news", "breaking news",
+        "stock", "share price", "stock price", "portfolio",
         # Local search keywords
         "search", "find", "near me", "nearby", "nearest",
         "restaurant", "hospital", "hotel", "atm", "bank", "pharmacy",
@@ -186,6 +187,8 @@ async def classify_domain(state: BotState) -> dict:
                     utility_intent = "weather"
                 elif intent == "get_news":
                     utility_intent = "news"
+                elif intent == "stock_price":
+                    utility_intent = "stock_price"
                 elif intent == "image":
                     utility_intent = "image"
                 elif intent == "set_reminder":

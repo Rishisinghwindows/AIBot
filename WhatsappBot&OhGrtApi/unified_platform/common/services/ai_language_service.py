@@ -74,6 +74,7 @@ INTENTS:
 - image: User wants AI image generation
 - word_game: User wants to play word game
 - get_news: User wants news
+- stock_price: User wants stock/share price or key stock stats
 - fact_check: User wants to verify a claim
 - get_horoscope: User wants daily/weekly horoscope
 - birth_chart: User wants kundli/birth chart
@@ -96,7 +97,13 @@ ENTITY EXTRACTION RULES:
 - For pnr_status: Extract "pnr" (10-digit number)
 - For train_status: Extract "train_number"
 - For get_horoscope: Extract "astro_sign" and "astro_period"
-- For get_news: Extract "news_query" and "news_category"
+- For get_news: Extract "news_query" (MUST be in English, e.g., "बिहार की खबर" → "Bihar news") and "news_category"
+  IMPORTANT: Always translate news topics to English for API calls:
+  - "बिहार की खबर" → news_query: "Bihar"
+  - "क्रिकेट न्यूज" → news_query: "cricket"
+  - "IPL समाचार" → news_query: "IPL"
+  - "राजनीति खबर" → news_query: "politics"
+- For stock_price: Extract "stock_name" (company or ticker) in English
 
 CRITICAL: All entity values must be normalized to English for API calls.
 City names in any language should be converted to English:
@@ -142,6 +149,24 @@ Output: {{
     "confidence": 0.95,
     "entities": {{"city": "Amritsar"}},
     "normalized_query": "Amritsar weather"
+}}
+
+User: "bihar ka top news batao"
+Output: {{
+    "detected_language": "hi",
+    "intent": "get_news",
+    "confidence": 0.95,
+    "entities": {{"news_query": "Bihar", "news_category": "general"}},
+    "normalized_query": "Bihar top news"
+}}
+
+User: "क्रिकेट की ताजा खबर"
+Output: {{
+    "detected_language": "hi",
+    "intent": "get_news",
+    "confidence": 0.95,
+    "entities": {{"news_query": "cricket", "news_category": "sports"}},
+    "normalized_query": "cricket latest news"
 }}
 
 Respond ONLY with valid JSON."""),

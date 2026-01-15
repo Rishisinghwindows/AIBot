@@ -90,19 +90,9 @@ def handle_chat(state: BotState) -> dict:
     logger.info(f"Chat handler using language: {language_name} ({language_code})")
 
     if not user_message:
-        # Return welcome message (could be translated via templates)
+        welcome_msg = get_chat_label("welcome", detected_lang)
         return {
-            "response_text": (
-                "Hi! I'm your WhatsApp assistant.\n\n"
-                "I can help you with:\n"
-                "- Weather updates\n"
-                "- Local search\n"
-                "- Train/PNR status\n"
-                "- Astrology predictions\n"
-                "- Image generation\n"
-                "- News updates\n\n"
-                "How can I help you today?"
-            ),
+            "response_text": welcome_msg,
             "response_type": "text",
             "should_fallback": False,
             "intent": INTENT,

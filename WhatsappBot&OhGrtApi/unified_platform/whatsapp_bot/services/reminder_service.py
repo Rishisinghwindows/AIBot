@@ -128,6 +128,13 @@ class ReminderService:
             return
 
         self._running = True
+        try:
+            loop = asyncio.get_running_loop()
+            self._task = loop.create_task(self._check_reminders())
+        except RuntimeError:
+            logger.error("Reminder scheduler not started: no running event loop")
+            self._running = False
+            return
         logger.info("Reminder scheduler started")
 
     def stop_scheduler(self) -> None:
@@ -135,6 +142,7 @@ class ReminderService:
         self._running = False
         if self._task:
             self._task.cancel()
+            self._task = None
         logger.info("Reminder scheduler stopped")
 
     async def _check_reminders(self) -> None:

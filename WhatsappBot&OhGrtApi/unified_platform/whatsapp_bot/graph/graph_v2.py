@@ -61,6 +61,7 @@ from whatsapp_bot.graph.nodes.weather import handle_weather
 from whatsapp_bot.graph.nodes.db_node import handle_db_query
 from whatsapp_bot.graph.nodes.reminder_node import handle_reminder
 from whatsapp_bot.graph.nodes.news_node import handle_news
+from whatsapp_bot.graph.nodes.stock_price import handle_stock_price
 
 # Game handler
 from whatsapp_bot.graph.nodes.word_game import handle_word_game
@@ -149,6 +150,8 @@ def route_utility(state: BotState) -> dict:
 
     if any(kw in query for kw in ["weather", "temperature", "forecast", "rain"]):
         return {"utility_intent": "weather"}
+    elif any(kw in query for kw in ["stock price", "share price", "stock", "portfolio"]):
+        return {"utility_intent": "stock_price"}
     elif any(kw in query for kw in ["news", "headlines", "breaking"]):
         return {"utility_intent": "news"}
     elif any(kw in query for kw in ["generate image", "create image", "draw", "picture"]):
@@ -174,6 +177,7 @@ def select_utility_handler(state: BotState) -> str:
     utility_intent = state.get("utility_intent", "db_query")
     return {
         "weather": "weather",
+        "stock_price": "stock_price",
         "news": "news",
         "image": "image_gen",
         "reminder": "reminder",
@@ -276,6 +280,7 @@ def create_graph_v2() -> StateGraph:
     # =========================================================================
     graph.add_node("utility_router", route_utility)
     graph.add_node("weather", handle_weather)
+    graph.add_node("stock_price", handle_stock_price)
     graph.add_node("news", handle_news)
     graph.add_node("image_gen", handle_image_generation)
     graph.add_node("reminder", handle_reminder)
@@ -338,6 +343,7 @@ def create_graph_v2() -> StateGraph:
         select_utility_handler,
         {
             "weather": "weather",
+            "stock_price": "stock_price",
             "news": "news",
             "image_gen": "image_gen",
             "reminder": "reminder",
@@ -349,7 +355,7 @@ def create_graph_v2() -> StateGraph:
     # All terminal handlers -> Check fallback -> End
     terminal_nodes = [
         "pnr_status", "train_status", "metro_ticket",
-        "weather", "news", "image_gen", "reminder", "local_search", "db_query",
+        "weather", "stock_price", "news", "image_gen", "reminder", "local_search", "db_query",
         "game", "chat"
     ]
 

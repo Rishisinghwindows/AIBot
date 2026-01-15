@@ -36,6 +36,7 @@ VALID_INTENTS = [
     "db_query",
     "set_reminder",
     "get_news",
+    "stock_price",
     "fact_check",
     "get_horoscope",
     "birth_chart",

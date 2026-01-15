@@ -15,8 +15,15 @@ from common.graph.nodes.intent import detect_intent
 from common.graph.nodes.chat import handle_chat, handle_fallback
 from common.graph.nodes.weather import handle_weather
 from common.graph.nodes.news import handle_news
+from common.graph.nodes.stock_price import handle_stock_price
 from common.config.settings import settings
 from common.i18n.detector import detect_language
+from common.graph.nodes.cricket_score import handle_cricket_score
+from common.graph.nodes.govt_jobs import handle_govt_jobs
+from common.graph.nodes.govt_schemes import handle_govt_schemes
+from common.graph.nodes.farmer_schemes import handle_farmer_schemes
+from common.graph.nodes.free_audio_sources import handle_free_audio_sources
+from common.graph.nodes.echallan import handle_echallan
 
 # AI Language Service (optional)
 try:
@@ -126,6 +133,14 @@ class CommonChatProcessor:
             handlers.append("train")
         if IMAGE_GEN_AVAILABLE:
             handlers.append("image")
+        handlers.extend([
+            "cricket_score",
+            "govt_jobs",
+            "govt_schemes",
+            "farmer_schemes",
+            "free_audio_sources",
+            "echallan",
+        ])
 
         logger.info(f"CommonChatProcessor initialized with handlers: {handlers}")
 
@@ -288,6 +303,32 @@ class CommonChatProcessor:
         # News
         elif intent in ["get_news", "news"]:
             return await call_handler(handle_news, state)
+
+        # Stock price
+        elif intent == "stock_price":
+            return await call_handler(handle_stock_price, state)
+
+        # Cricket score
+        elif intent == "cricket_score":
+            return await call_handler(handle_cricket_score, state)
+
+        # Government jobs
+        elif intent == "govt_jobs":
+            return await call_handler(handle_govt_jobs, state)
+
+        # Government schemes
+        elif intent == "govt_schemes":
+            return await call_handler(handle_govt_schemes, state)
+
+        # Farmer schemes/subsidies
+        elif intent == "farmer_schemes":
+            return await call_handler(handle_farmer_schemes, state)
+
+        # Free audio sources
+        elif intent == "free_audio_sources":
+            return await call_handler(handle_free_audio_sources, state)
+        elif intent == "echallan":
+            return await call_handler(handle_echallan, state)
 
         # Horoscope
         elif intent in ["get_horoscope", "horoscope"] and HOROSCOPE_AVAILABLE:

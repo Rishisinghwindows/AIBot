@@ -20,7 +20,8 @@ from common.whatsapp.models import (
     extract_message,
     is_status_update,
 )
-from common.llm.openai_client import transcribe_audio
+from common.i18n.detector import detect_language
+from common.services.stt_service import get_stt_service
 
 logger = logging.getLogger(__name__)
 
@@ -168,6 +169,7 @@ async def process_and_respond(message: dict) -> None:
         )
 
     is_voice_input = message.get("message_type") == "audio"
+    is_image_input = message.get("message_type") == "image"
 
     ctx_service = None
     try:
@@ -196,21 +198,32 @@ async def process_and_respond(message: dict) -> None:
                 if media_url:
                     audio_bytes = await client.download_media(media_url)
                     if audio_bytes:
-                        transcribed = await transcribe_audio(
-                            audio_bytes,
-                            api_key=settings.openai_api_key,
-                        )
-                        message["text"] = transcribed
-                        logger.info(f"Transcribed: {transcribed[:50]}...")
+                        stt_service = get_stt_service()
+                        transcribed = await stt_service.transcribe_bytes(audio_bytes)
+                        if transcribed:
+                            message["text"] = transcribed
+                            logger.info(f"Transcribed: {transcribed[:50]}...")
             except Exception as e:
                 logger.error(f"Transcription failed: {e}")
                 message["text"] = "Voice message received"
+
+        # Handle image messages
+        if is_image_input and message.get("media_id"):
+            try:
+                media_url = await client.get_media_url(message["media_id"])
+                if media_url:
+                    image_bytes = await client.download_media(media_url)
+                    if image_bytes:
+                        message["image_bytes"] = image_bytes
+            except Exception as e:
+                logger.error(f"Image download failed: {e}", exc_info=True)
 
         # Send typing indicator
         try:
             await client.send_typing_indicator(
                 to=message["from_number"],
                 message_id=message["message_id"],
+                duration=3,
             )
             logger.debug("Typing indicator sent")
         except Exception as e:
@@ -221,6 +234,54 @@ async def process_and_respond(message: dict) -> None:
 
         response_text = result.get("response_text", "")
         response_type = result.get("response_type", "text")
+
+        # If input was voice and we have a text response, convert to voice
+        if is_voice_input and response_text and response_type == "text":
+            try:
+                from common.services.tts_service import get_tts_service
+
+                tts_service = get_tts_service()
+                detected_lang = result.get("detected_language") or detect_language(response_text)
+                audio_bytes = await tts_service.text_to_speech(
+                    text=response_text,
+                    language=detected_lang,
+                )
+
+                if audio_bytes:
+                    mime_type = tts_service.get_audio_mime_type()
+                    audio_id = await client.upload_media(
+                        media_bytes=audio_bytes,
+                        mime_type=mime_type,
+                    )
+                    if audio_id:
+                        await client.send_audio_message(
+                            to=message["from_number"],
+                            audio_id=audio_id,
+                            reply_to=message["message_id"],
+                        )
+                    else:
+                        raise RuntimeError("Audio upload failed")
+                    await client.send_text_message(
+                        to=message["from_number"],
+                        text=f"📝 {response_text}",
+                    )
+                    if ctx_service:
+                        try:
+                            await ctx_service.record_whatsapp_message(
+                                phone=message.get("from_number", ""),
+                                direction="outgoing",
+                                text=response_text,
+                                response_type="audio",
+                                media_url=audio_id,
+                            )
+                        except Exception:
+                            pass
+                    return
+
+            except ImportError as e:
+                logger.warning(f"TTS service not available: {e}")
+            except Exception as e:
+                logger.error(f"TTS generation failed: {e}", exc_info=True)
 
         # Send response
         if response_type == "text" and response_text:

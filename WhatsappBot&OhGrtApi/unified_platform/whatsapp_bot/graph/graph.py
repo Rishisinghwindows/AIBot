@@ -18,9 +18,11 @@ from whatsapp_bot.graph.nodes.intent_v2 import detect_intent
 from common.graph.nodes.chat import handle_chat, handle_fallback
 from common.graph.nodes.weather import handle_weather
 from whatsapp_bot.graph.nodes.news_node import handle_news
+from whatsapp_bot.graph.nodes.stock_price import handle_stock_price
 
 # Import pending location store for location message routing
 from whatsapp_bot.stores.pending_location_store import get_pending_location_store
+from whatsapp_bot.stores.pending_reminder_store import get_pending_reminder_store
 
 # Import bot-specific nodes
 from whatsapp_bot.graph.nodes.pnr_status import handle_pnr_status
@@ -31,6 +33,13 @@ from whatsapp_bot.graph.nodes.image import handle_image_generation
 from whatsapp_bot.graph.nodes.image_analysis import handle_image_analysis
 from whatsapp_bot.graph.nodes.reminder import handle_reminder
 from whatsapp_bot.graph.nodes.help import handle_help
+from whatsapp_bot.graph.nodes.cricket_score import handle_cricket_score
+from whatsapp_bot.graph.nodes.govt_jobs import handle_govt_jobs
+from whatsapp_bot.graph.nodes.govt_schemes import handle_govt_schemes
+from whatsapp_bot.graph.nodes.farmer_schemes import handle_farmer_schemes
+from whatsapp_bot.graph.nodes.free_audio_sources import handle_free_audio_sources
+from whatsapp_bot.graph.nodes.echallan import handle_echallan
+from whatsapp_bot.graph.context_cache import set_context as set_followup_context
 
 # Import new nodes from d23apiv1
 try:
@@ -309,6 +318,14 @@ async def check_message_type(state: BotState) -> str:
         else:
             logger.info(f"Location message from {phone} without pending search, going to intent detection")
 
+    # Route pending reminder follow-ups directly to reminder handler
+    if message_type == "text":
+        pending_reminder_store = get_pending_reminder_store()
+        pending_reminder = await pending_reminder_store.peek_pending(phone)
+        if pending_reminder:
+            logger.info(f"Text message from {phone} with pending reminder, routing to set_reminder")
+            return "set_reminder"
+
     # All other messages go through intent detection
     return "intent_detection"
 
@@ -340,8 +357,15 @@ def route_by_intent(state: BotState) -> str:
         # Utilities
         "weather": "weather",
         "get_news": "get_news",
+        "stock_price": "stock_price",
+        "image_analysis": "image_analysis",
         "image": "image_gen",
         "set_reminder": "set_reminder",
+        "cricket_score": "cricket_score",
+        "govt_jobs": "govt_jobs",
+        "govt_schemes": "govt_schemes",
+        "free_audio_sources": "free_audio_sources",
+        "echallan": "echallan",
         "local_search": "local_search" if LOCAL_SEARCH_AVAILABLE else "chat",
         "word_game": "word_game" if WORD_GAME_AVAILABLE else "chat",
         "fact_check": "fact_check" if FACT_CHECK_AVAILABLE else "chat",
@@ -387,6 +411,7 @@ def create_graph() -> StateGraph:
     graph.add_node("chat", handle_chat)
     graph.add_node("weather", handle_weather)
     graph.add_node("get_news", handle_news)
+    graph.add_node("stock_price", handle_stock_price)
     graph.add_node("pnr_status", handle_pnr_status)
     graph.add_node("train_status", handle_train_status)
     graph.add_node("get_horoscope", handle_horoscope)
@@ -395,6 +420,12 @@ def create_graph() -> StateGraph:
     graph.add_node("image_analysis", handle_image_analysis)
     graph.add_node("set_reminder", handle_reminder)
     graph.add_node("help", handle_help)
+    graph.add_node("cricket_score", handle_cricket_score)
+    graph.add_node("govt_jobs", handle_govt_jobs)
+    graph.add_node("govt_schemes", handle_govt_schemes)
+    graph.add_node("farmer_schemes", handle_farmer_schemes)
+    graph.add_node("free_audio_sources", handle_free_audio_sources)
+    graph.add_node("echallan", handle_echallan)
     graph.add_node("fallback", handle_fallback)
 
     # Add optional nodes if available
@@ -423,6 +454,7 @@ def create_graph() -> StateGraph:
         "image_analysis": "image_analysis",
         "intent_detection": "intent_detection",
         "weather": "weather",  # For location messages with pending weather request
+        "set_reminder": "set_reminder",
     }
     # Add local_search route if available (for location messages with pending search)
     if LOCAL_SEARCH_AVAILABLE:
@@ -445,7 +477,15 @@ def create_graph() -> StateGraph:
         "subscription": "subscription",
         "weather": "weather",
         "get_news": "get_news",
+        "stock_price": "stock_price",
+        "cricket_score": "cricket_score",
+        "govt_jobs": "govt_jobs",
+        "govt_schemes": "govt_schemes",
+        "farmer_schemes": "farmer_schemes",
+        "free_audio_sources": "free_audio_sources",
+        "echallan": "echallan",
         "image_gen": "image_gen",
+        "image_analysis": "image_analysis",
         "set_reminder": "set_reminder",
         "help": "help",
         "chat": "chat",
@@ -485,6 +525,12 @@ def create_graph() -> StateGraph:
         "chat",
         "weather",
         "get_news",
+        "stock_price",
+        "cricket_score",
+        "govt_jobs",
+        "govt_schemes",
+        "free_audio_sources",
+        "echallan",
         "pnr_status",
         "train_status",
         "get_horoscope",
@@ -592,7 +638,7 @@ async def process_message(whatsapp_message: Dict) -> Dict:
     if response_type in ["text", "location_request"] and response_text:
         response_text = await _translate_response(response_text, detected_lang)
 
-    return {
+    response = {
         "response_text": response_text,
         "response_type": response_type,
         "response_media_url": result.get("response_media_url"),
@@ -601,6 +647,21 @@ async def process_message(whatsapp_message: Dict) -> Dict:
         "tool_result": result.get("tool_result"),
         "buttons": result.get("buttons"),
     }
+    phone = whatsapp_message.get("from_number", "")
+    if phone:
+        set_followup_context(
+            phone,
+            {
+                "last_user_query": whatsapp_message.get("text", "") or "",
+                "last_bot_response": response_text,
+                "last_intent": result.get("intent", "unknown"),
+                "last_entities": result.get("extracted_entities", {}) or {},
+                # Store recent tool output for follow-up queries (e.g., image OCR text).
+                "last_tool_result": result.get("tool_result"),
+            },
+        )
+
+    return response
 
 
 def process_message_sync(whatsapp_message: Dict) -> Dict:

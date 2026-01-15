@@ -54,9 +54,11 @@ unified_platform/
 ```bash
 cd unified_platform
 
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+# Create virtual environment (Python 3.11 required for Coqui TTS)
+python3.11 -m venv venv311
+source venv311/bin/activate  # On Windows: venv311\Scripts\activate
+
+# Note: If you already have a Python 3.14 venv, keep it and use venv311 for local TTS.
 
 # Install dependencies
 pip install -r requirements.txt  # Common

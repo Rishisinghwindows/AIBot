@@ -85,11 +85,49 @@ LANGUAGE_VOICE_MAP = {
 
 
 class TTSService:
-    """Text-to-Speech service using Edge TTS (free, no API key needed)."""
+    """Text-to-Speech service using Edge TTS or Coqui TTS (local)."""
 
     def __init__(self):
         """Initialize TTS service."""
         self._edge_tts_available = None
+        self._coqui_available = None
+        self._coqui_tts = None
+        self._provider = os.getenv("TTS_PROVIDER", "edge").lower()
+        self._coqui_model = os.getenv("COQUI_TTS_MODEL", "tts_models/multilingual/multi-dataset/xtts_v2")
+        self._coqui_speaker = os.getenv("COQUI_TTS_SPEAKER")
+        self._coqui_speaker_wav = os.getenv("COQUI_TTS_SPEAKER_WAV")
+        if self._coqui_speaker_wav and not os.path.exists(self._coqui_speaker_wav):
+            logger.warning(
+                "COQUI_TTS_SPEAKER_WAV not found: %s",
+                self._coqui_speaker_wav,
+            )
+            self._coqui_speaker_wav = None
+
+    def get_audio_mime_type(self) -> str:
+        """Return MIME type for generated audio."""
+        if self._provider == "coqui":
+            return "audio/wav"
+        return "audio/mpeg"
+
+    async def _check_coqui(self) -> bool:
+        """Check if Coqui TTS is available."""
+        if self._coqui_available is None:
+            try:
+                import TTS  # noqa: F401
+                import soundfile  # noqa: F401
+                self._coqui_available = True
+            except ImportError:
+                logger.warning("Coqui TTS not installed. Install with: pip install TTS soundfile")
+                self._coqui_available = False
+        return self._coqui_available
+
+    def _get_coqui(self):
+        """Lazy load Coqui TTS model."""
+        if self._coqui_tts is None:
+            from TTS.api import TTS
+            logger.info(f"Loading Coqui TTS model: {self._coqui_model}")
+            self._coqui_tts = TTS(self._coqui_model)
+        return self._coqui_tts
 
     async def _check_edge_tts(self) -> bool:
         """Check if edge-tts is available."""
@@ -110,7 +148,7 @@ class TTSService:
         rate: str = "+0%",
     ) -> Optional[bytes]:
         """
-        Convert text to speech audio using Edge TTS.
+        Convert text to speech audio using Edge TTS or Coqui (local).
 
         Args:
             text: Text to convert
@@ -121,18 +159,41 @@ class TTSService:
         Returns:
             Audio bytes (MP3) or None if failed
         """
+        # Sanitize text to remove emojis and special characters
+        text = sanitize_text_for_tts(text)
+        if not text or len(text.strip()) == 0:
+            logger.warning("TTS: Text is empty after sanitization, skipping")
+            return None
+
+        if self._provider == "coqui":
+            if not await self._check_coqui():
+                return None
+            try:
+                import io
+                import soundfile as sf
+
+                tts = self._get_coqui()
+                logger.info(f"Coqui TTS: Generating audio ({len(text)} chars) lang={language}")
+                tts_kwargs = {"text": text}
+                if language:
+                    tts_kwargs["language"] = language
+                if self._coqui_speaker:
+                    tts_kwargs["speaker"] = self._coqui_speaker
+                if self._coqui_speaker_wav:
+                    tts_kwargs["speaker_wav"] = self._coqui_speaker_wav
+                audio = tts.tts(**tts_kwargs)
+                buf = io.BytesIO()
+                sample_rate = getattr(tts.synthesizer, "output_sample_rate", 22050)
+                sf.write(buf, audio, samplerate=sample_rate, format="WAV")
+                return buf.getvalue()
+            except Exception as e:
+                logger.error(f"Coqui TTS generation failed: {e}", exc_info=True)
+                return None
+
         if not await self._check_edge_tts():
             return None
 
         import edge_tts
-
-        # Sanitize text to remove emojis and special characters
-        text = sanitize_text_for_tts(text)
-
-        # Check if text is empty after sanitization
-        if not text or len(text.strip()) == 0:
-            logger.warning("TTS: Text is empty after sanitization, skipping")
-            return None
 
         # Select voice based on language if not specified
         if voice is None:

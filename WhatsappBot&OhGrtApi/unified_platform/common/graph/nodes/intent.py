@@ -32,7 +32,7 @@ class IntentClassification(BaseModel):
     """Structured output for intent classification."""
 
     intent: str = Field(
-        description="The classified intent: local_search, image, pnr_status, train_status, metro_ticket, weather, word_game, db_query, set_reminder, get_news, fact_check, get_horoscope, birth_chart, kundli_matching, ask_astrologer, numerology, tarot_reading, life_prediction, dosha_check, get_panchang, get_remedy, find_muhurta, or chat"
+        description="The classified intent: local_search, image, pnr_status, train_status, metro_ticket, weather, word_game, db_query, set_reminder, get_news, stock_price, cricket_score, govt_jobs, govt_schemes, farmer_schemes, free_audio_sources, echallan, fact_check, get_horoscope, birth_chart, kundli_matching, ask_astrologer, numerology, tarot_reading, life_prediction, dosha_check, get_panchang, get_remedy, find_muhurta, or chat"
     )
     confidence: float = Field(description="Confidence score between 0 and 1")
     entities: dict = Field(
@@ -98,6 +98,35 @@ Extract: "reminder_time", "reminder_message"
 Use for news and current affairs.
 Examples: "latest news", "cricket news", "news about India"
 Extract: "news_query", "news_category"
+
+**STOCK PRICE** - stock_price:
+Use for stock/share price and key stock stats.
+Examples: "tata motors stock price", "share price of reliance", "AAPL price"
+Extract: "stock_name"
+
+**CRICKET SCORE** - cricket_score:
+Use for live cricket score updates.
+Examples: "cricket score", "live score", "IPL score", "scorecard"
+
+**GOVT JOBS** - govt_jobs:
+Use for government job openings/notifications.
+Examples: "govt jobs in bihar", "sarkari naukri", "government jobs"
+
+**GOVT SCHEMES** - govt_schemes:
+Use for government schemes/yojanas.
+Examples: "schemes in bihar", "sarkari yojana", "central government schemes"
+
+**FARMER SCHEMES** - farmer_schemes:
+Use for farmer schemes/subsidies.
+Examples: "farmer subsidy kerala", "kisan scheme up", "farmers scheme in tamilnadu"
+
+**FREE AUDIO SOURCES** - free_audio_sources:
+Use for free/royalty-free audio sources.
+Examples: "free audio sources", "royalty free music", "free songs"
+
+**E-CHALLAN** - echallan:
+Use for vehicle/traffic challan checks (All India).
+Examples: "check challan", "traffic challan", "vehicle challan status", "e challan"
 
 **FACT CHECK** - fact_check:
 Use when user wants to verify a claim or check if something is true/fake.
@@ -286,6 +315,27 @@ async def detect_intent(state: BotState) -> dict:
             "intent": "pnr_status",
             "intent_confidence": 0.95,
             "extracted_entities": {"pnr": pnr_match},
+            "current_query": user_message,
+            "detected_language": detected_lang,
+            "error": None,
+        }
+
+    # Check for e-challan patterns
+    echallan_keywords = [
+        "challan",
+        "e-challan",
+        "echallan",
+        "traffic challan",
+        "vehicle challan",
+        "vehicle fine",
+        "traffic fine",
+        "challan status",
+    ]
+    if any(kw in user_lower for kw in echallan_keywords):
+        return {
+            "intent": "echallan",
+            "intent_confidence": 0.9,
+            "extracted_entities": {},
             "current_query": user_message,
             "detected_language": detected_lang,
             "error": None,
@@ -576,6 +626,23 @@ async def detect_intent(state: BotState) -> dict:
             "error": None,
         }
 
+    # Check for stock price patterns
+    stock_keywords = [
+        "stock price", "share price", "stock quote", "share quote", "stock rate",
+        "stock value", "share value", "stock today", "share today",
+        "portfolio", "stocks",
+        "शेयर भाव", "स्टॉक प्राइस", "शेयर प्राइस", "स्टॉक भाव",
+    ]
+    if any(kw in user_lower for kw in stock_keywords):
+        return {
+            "intent": "stock_price",
+            "intent_confidence": 0.9,
+            "extracted_entities": {"stock_name": user_message},
+            "current_query": user_message,
+            "detected_language": detected_lang,
+            "error": None,
+        }
+
     # Check for news patterns
     news_keywords = ["news", "headlines", "latest news", "breaking news"]
     if any(kw in user_lower for kw in news_keywords):
@@ -583,6 +650,89 @@ async def detect_intent(state: BotState) -> dict:
             "intent": "get_news",
             "intent_confidence": 0.9,
             "extracted_entities": {"news_query": user_message.replace("news about", "").strip()},
+            "current_query": user_message,
+            "detected_language": detected_lang,
+            "error": None,
+        }
+
+    cricket_keywords = ["cricket score", "live score", "scorecard", "ipl score", "क्रिकेट स्कोर", "लाइव स्कोर"]
+    if any(kw in user_lower for kw in cricket_keywords) or any(kw in user_message for kw in cricket_keywords):
+        return {
+            "intent": "cricket_score",
+            "intent_confidence": 0.9,
+            "extracted_entities": {},
+            "current_query": user_message,
+            "detected_language": detected_lang,
+            "error": None,
+        }
+
+    govt_jobs_keywords = [
+        "government jobs", "govt jobs", "sarkari job", "sarkari naukri",
+        "सरकारी नौकरी", "सरकारी जॉब", "भर्ती", "वैकेंसी", "नौकरी",
+        "central government jobs", "state government jobs",
+    ]
+    if any(kw in user_lower for kw in govt_jobs_keywords) or any(kw in user_message for kw in govt_jobs_keywords):
+        return {
+            "intent": "govt_jobs",
+            "intent_confidence": 0.9,
+            "extracted_entities": {},
+            "current_query": user_message,
+            "detected_language": detected_lang,
+            "error": None,
+        }
+
+    farmer_schemes_keywords = [
+        "farmer scheme", "farmers scheme", "farmer subsidy", "farmers subsidy",
+        "kisan scheme", "kisan yojana", "krishi yojana", "agri subsidy",
+        "agriculture scheme", "agriculture subsidy", "pm kisan", "pm-kisan",
+        "किसान योजना", "किसान सब्सिडी", "कृषि योजना", "कृषि सब्सिडी", "किसान सहायता",
+    ]
+    farmer_scheme_patterns = [
+        r"\b(farmer|farmers|kisan|kisaan|krishi|agri|agriculture)\b.*\b(scheme|yojana|subsidy|subsidies|benefit|grant)\b",
+        r"\b(scheme|yojana|subsidy|subsidies|benefit|grant)\b.*\b(farmer|farmers|kisan|kisaan|krishi|agri|agriculture)\b",
+        r"(किसान|कृषि).*?(योजना|सब्सिडी|सहायता|लाभ)",
+    ]
+    if (
+        any(kw in user_lower for kw in farmer_schemes_keywords)
+        or any(kw in user_message for kw in farmer_schemes_keywords)
+        or any(re.search(pattern, user_lower) for pattern in farmer_scheme_patterns)
+        or any(re.search(pattern, user_message) for pattern in farmer_scheme_patterns)
+    ):
+        return {
+            "intent": "farmer_schemes",
+            "intent_confidence": 0.9,
+            "extracted_entities": {},
+            "current_query": user_message,
+            "detected_language": detected_lang,
+            "error": None,
+        }
+
+    govt_schemes_keywords = [
+        "government schemes", "govt schemes", "government scheme",
+        "sarkari yojana", "yojana", "scheme", "welfare scheme",
+        "central schemes", "state schemes",
+        "सरकारी योजना", "योजना", "स्कीम", "कल्याण योजना",
+    ]
+    if any(kw in user_lower for kw in govt_schemes_keywords) or any(kw in user_message for kw in govt_schemes_keywords):
+        return {
+            "intent": "govt_schemes",
+            "intent_confidence": 0.9,
+            "extracted_entities": {},
+            "current_query": user_message,
+            "detected_language": detected_lang,
+            "error": None,
+        }
+
+    free_audio_keywords = [
+        "free audio", "free music", "royalty free music", "royalty free audio",
+        "audio library", "free songs", "free mp3", "free bhakti songs",
+        "फ्री ऑडियो", "फ्री म्यूजिक", "रॉयल्टी फ्री", "फ्री गाने",
+    ]
+    if any(kw in user_lower for kw in free_audio_keywords) or any(kw in user_message for kw in free_audio_keywords):
+        return {
+            "intent": "free_audio_sources",
+            "intent_confidence": 0.9,
+            "extracted_entities": {},
             "current_query": user_message,
             "detected_language": detected_lang,
             "error": None,
@@ -1259,6 +1409,13 @@ async def detect_intent(state: BotState) -> dict:
             "db_query",
             "set_reminder",
             "get_news",
+            "stock_price",
+            "cricket_score",
+            "govt_jobs",
+            "govt_schemes",
+            "farmer_schemes",
+            "free_audio_sources",
+            "echallan",
             "fact_check",
             # Astrology intents
             "get_horoscope",

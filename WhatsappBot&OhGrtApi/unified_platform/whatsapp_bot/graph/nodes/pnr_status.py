@@ -147,10 +147,11 @@ async def handle_pnr_status(state: BotState) -> Dict:
         api_key = settings.railway_api_key
 
         if not api_key:
+            message = get_train_label("pnr_not_configured", detected_lang)
             return {
-                "response_text": "PNR service is not configured.",
+                "response_text": message,
                 "response_type": "text",
-                "should_fallback": True,
+                "should_fallback": False,
                 "intent": INTENT,
             }
 
@@ -175,7 +176,7 @@ async def handle_pnr_status(state: BotState) -> Dict:
         return {
             "response_text": error_msg,
             "response_type": "text",
-            "should_fallback": True,
+            "should_fallback": False,
             "intent": INTENT,
             "error": str(e),
             "route_log": state.get("route_log", []) + ["pnr_status:error"],

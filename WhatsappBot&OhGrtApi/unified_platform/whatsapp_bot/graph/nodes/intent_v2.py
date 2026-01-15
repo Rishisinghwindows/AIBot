@@ -17,6 +17,7 @@ from common.config.settings import settings as common_settings
 from common.utils.entity_extraction import extract_pnr, extract_train_number
 from whatsapp_bot.stores.pending_location_store import get_pending_location_store
 from common.i18n.detector import detect_language
+from whatsapp_bot.graph.context_cache import get_context as get_followup_context
 
 # AI Language Service (optional)
 try:
@@ -27,18 +28,94 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+CONTEXT_TTL_SECONDS = 600
+CONTEXT_REUSE_INTENTS = {
+    "weather",
+    "get_news",
+    "stock_price",
+    "cricket_score",
+    "govt_jobs",
+    "govt_schemes",
+    "farmer_schemes",
+    "local_search",
+    "events",
+    "food_order",
+    "image_analysis",
+}
+CONTEXT_HINTS = [
+    "and", "also", "what about", "tomorrow", "today", "now", "this", "same",
+    "again", "update", "next", "more", "price", "humidity", "wind",
+]
+GREETING_ONLY = {"hi", "hello", "hey", "namaste", "hola"}
+
+
+def _should_reuse_context(message: str) -> bool:
+    msg = (message or "").strip().lower()
+    if not msg or msg in GREETING_ONLY:
+        return False
+    if len(msg.split()) <= 4:
+        return True
+    return any(hint in msg for hint in CONTEXT_HINTS)
+
+
+def _is_image_followup_request(message: str) -> bool:
+    msg = (message or "").lower()
+    keywords = [
+        "image me", "photo me", "is image", "is photo",
+        "jo text", "text hai", "likha", "kya likha",
+        "read the text", "extract text", "ocr",
+        "image text", "photo text",
+    ]
+    return any(kw in msg for kw in keywords)
+
+
+def _maybe_use_recent_context(
+    phone: str,
+    message: str,
+    intent: str,
+    confidence: float,
+    entities: dict,
+) -> tuple[str, float, dict]:
+    # Reuse recent intent for short follow-ups to avoid stateless replies.
+    if intent not in ["chat", "unknown"] and confidence >= 0.6:
+        return intent, confidence, entities
+    if not _should_reuse_context(message):
+        return intent, confidence, entities
+
+    cached = get_followup_context(phone) if phone else None
+    if not cached:
+        return intent, confidence, entities
+    last_intent = cached.get("last_intent")
+    last_entities = cached.get("last_entities") or {}
+    if last_intent in CONTEXT_REUSE_INTENTS:
+        return last_intent, max(confidence, 0.7), last_entities
+    return intent, confidence, entities
 
 class IntentClassification(BaseModel):
     """Structured output for intent classification."""
 
     intent: str = Field(
-        description="The classified intent: local_search, image, pnr_status, train_status, metro_ticket, weather, word_game, db_query, set_reminder, get_news, fact_check, get_horoscope, birth_chart, kundli_matching, ask_astrologer, numerology, tarot_reading, life_prediction, dosha_check, get_panchang, get_remedy, find_muhurta, or chat"
+        description="The classified intent: local_search, image, pnr_status, train_status, metro_ticket, weather, word_game, db_query, set_reminder, get_news, stock_price, cricket_score, govt_jobs, govt_schemes, farmer_schemes, free_audio_sources, echallan, fact_check, get_horoscope, birth_chart, kundli_matching, ask_astrologer, numerology, tarot_reading, life_prediction, dosha_check, get_panchang, get_remedy, find_muhurta, or chat"
     )
     confidence: float = Field(description="Confidence score between 0 and 1")
     entities: dict = Field(
         description="Extracted entities relevant to the intent",
         default_factory=dict,
     )
+
+
+def _is_followup_request(message: str) -> bool:
+    msg = message.lower().strip()
+    if not msg or len(msg) > 80:
+        return False
+    followups = [
+        "more", "more result", "more results", "some more", "next", "another",
+        "one more", "again", "same", "same please",
+        "aur", "aur result", "aur results", "aur bhi", "kuch aur", "phir se",
+        "details", "detail", "details of these", "how to get details", "how to apply",
+        "link", "links", "website", "site",
+    ]
+    return any(kw in msg for kw in followups)
 
 
 INTENT_PROMPT = ChatPromptTemplate.from_messages(
@@ -68,6 +145,20 @@ Classify the user message into one of these intents:
   Examples: "remind me in 5 minutes to call John", "set an alarm for 9 AM to take medicine", "remind me to buy groceries tomorrow"
 - get_news: User wants to get news headlines.
   Examples: "latest news", "cricket news", "news about dhoni"
+- stock_price: User wants a stock/share price or key stock stats
+  Examples: "tata motors stock price", "share price of reliance", "AAPL price"
+- cricket_score: User wants live cricket scores or score updates
+  Examples: "cricket score", "live score", "IPL score", "scorecard"
+- govt_jobs: User wants government job openings or notifications (state-wise or central)
+  Examples: "govt jobs in bihar", "sarkari naukri delhi", "central government jobs"
+- govt_schemes: User wants government schemes/yojanas (state-wise or central)
+  Examples: "schemes in bihar", "sarkari yojana delhi", "central government schemes"
+- farmer_schemes: User wants farmer schemes/subsidies (state-wise or central)
+  Examples: "farmer subsidy kerala", "kisan scheme up", "farmers scheme in tamilnadu"
+- free_audio_sources: User wants free/royalty-free audio sources
+  Examples: "free audio sources", "royalty free music", "free songs for use"
+- echallan: User wants vehicle/traffic challan checks (All India)
+  Examples: "check challan", "traffic challan", "vehicle challan status", "e challan"
 - fact_check: User wants to verify if a claim, news, or statement is true or false
   Examples: "fact check: drinking warm water kills coronavirus", "is this true: 5G causes health problems", "verify: earth is flat", "is this news real", "is this fake news", "sach hai kya", "jhooth hai kya"
 
@@ -100,6 +191,7 @@ Extract relevant entities based on intent:
 - For weather: Extract the city name as "city"
 - For set_reminder: Extract the reminder time as "reminder_time" and the reminder message as "reminder_message"
 - For get_news: Extract the news query as "news_query" and news category as "news_category"
+- For stock_price: Extract company or ticker as "stock_name"
 - For fact_check: Extract the claim to verify as "fact_check_claim"
 - For get_horoscope: Extract "astro_sign" (zodiac sign) and "astro_period" (today/tomorrow/weekly/monthly)
 - For birth_chart: Extract "name", "birth_date", "birth_time", "birth_place"
@@ -195,6 +287,31 @@ async def detect_intent(state: BotState) -> dict:
         else:
             detected_lang = detect_language(user_message)
     logger.info(f"Detected language: {detected_lang} for message: {(user_message or '')[:50]}...")
+
+    # Follow-up handling: reuse last intent + query for short follow-ups
+    if user_message and _is_followup_request(user_message):
+        cached = get_followup_context(phone) if phone else None
+        last_intent = (cached or {}).get("last_intent")
+        last_query = (cached or {}).get("last_user_query")
+        followup_intents = {
+            "govt_jobs",
+            "govt_schemes",
+            "farmer_schemes",
+            "get_news",
+            "cricket_score",
+            "local_search",
+            "free_audio_sources",
+        }
+        if last_intent in followup_intents and last_query:
+            logger.info(f"Follow-up detected. Reusing intent={last_intent}")
+            return {
+                "intent": last_intent,
+                "intent_confidence": 0.9,
+                "extracted_entities": {"followup": True},
+                "current_query": last_query,
+                "detected_language": detected_lang,
+                "error": None,
+            }
 
     # Check if this is a location message with a pending search
     if message_type == "location" and whatsapp_message.get("location"):
@@ -434,6 +551,27 @@ async def detect_intent(state: BotState) -> dict:
             "error": None,
         }
 
+    # Check for e-challan patterns
+    echallan_keywords = [
+        "challan",
+        "e-challan",
+        "echallan",
+        "traffic challan",
+        "vehicle challan",
+        "vehicle fine",
+        "traffic fine",
+        "challan status",
+    ]
+    if any(kw in user_lower for kw in echallan_keywords):
+        return {
+            "intent": "echallan",
+            "intent_confidence": 0.9,
+            "extracted_entities": {},
+            "current_query": user_message,
+            "detected_language": detected_lang,
+            "error": None,
+        }
+
     # Check for train status patterns - multi-language support
     train_keywords = [
         # English
@@ -629,6 +767,122 @@ async def detect_intent(state: BotState) -> dict:
             "detected_language": detected_lang,
             "error": None,
         }
+
+    cricket_score_keywords = [
+        # English
+        "cricket score", "live score", "scorecard", "match score",
+        "ipl score", "wpl score", "t20 score", "odi score", "test score",
+        "cricket live", "live cricket", "score update", "runs", "overs",
+        # Hindi
+        "क्रिकेट स्कोर", "लाइव स्कोर", "स्कोरकार्ड", "मैच स्कोर",
+        "आईपीएल स्कोर", "डब्ल्यूपीएल स्कोर", "स्कोर अपडेट", "रन", "ओवर",
+    ]
+    if any(kw in user_lower for kw in cricket_score_keywords) or any(kw in user_message for kw in cricket_score_keywords):
+        return {
+            "intent": "cricket_score",
+            "intent_confidence": 0.9,
+            "extracted_entities": {},
+            "current_query": user_message,
+            "detected_language": detected_lang,
+            "error": None,
+        }
+
+    govt_jobs_keywords = [
+        # English
+        "government jobs", "govt jobs", "sarkari job", "sarkari naukri",
+        "job vacancy", "job openings", "recruitment", "bharti", "vacancy",
+        "central government jobs", "state government jobs",
+        # Hindi
+        "सरकारी नौकरी", "सरकारी जॉब", "भर्ती", "वैकेंसी", "नौकरी",
+        "केंद्र सरकार नौकरी", "राज्य सरकार नौकरी",
+    ]
+    if any(kw in user_lower for kw in govt_jobs_keywords) or any(kw in user_message for kw in govt_jobs_keywords):
+        return {
+            "intent": "govt_jobs",
+            "intent_confidence": 0.9,
+            "extracted_entities": {},
+            "current_query": user_message,
+            "detected_language": detected_lang,
+            "error": None,
+        }
+
+    farmer_schemes_keywords = [
+        # English
+        "farmer scheme", "farmers scheme", "farmer subsidy", "farmers subsidy",
+        "kisan scheme", "kisan yojana", "krishi yojana", "agri subsidy",
+        "agriculture scheme", "agriculture subsidy", "pm kisan", "pm-kisan",
+        # Hindi
+        "किसान योजना", "किसान सब्सिडी", "कृषि योजना", "कृषि सब्सिडी", "किसान सहायता",
+    ]
+    farmer_scheme_patterns = [
+        r"\b(farmer|farmers|kisan|kisaan|krishi|agri|agriculture)\b.*\b(scheme|yojana|subsidy|subsidies|benefit|grant)\b",
+        r"\b(scheme|yojana|subsidy|subsidies|benefit|grant)\b.*\b(farmer|farmers|kisan|kisaan|krishi|agri|agriculture)\b",
+        r"(किसान|कृषि).*?(योजना|सब्सिडी|सहायता|लाभ)",
+    ]
+    if (
+        any(kw in user_lower for kw in farmer_schemes_keywords)
+        or any(kw in user_message for kw in farmer_schemes_keywords)
+        or any(re.search(pattern, user_lower) for pattern in farmer_scheme_patterns)
+        or any(re.search(pattern, user_message) for pattern in farmer_scheme_patterns)
+    ):
+        return {
+            "intent": "farmer_schemes",
+            "intent_confidence": 0.9,
+            "extracted_entities": {},
+            "current_query": user_message,
+            "detected_language": detected_lang,
+            "error": None,
+        }
+
+    govt_schemes_keywords = [
+        # English
+        "government schemes", "govt schemes", "government scheme",
+        "sarkari yojana", "yojana", "scheme", "welfare scheme",
+        "central schemes", "state schemes",
+        # Hindi
+        "सरकारी योजना", "योजना", "स्कीम", "कल्याण योजना",
+    ]
+    if any(kw in user_lower for kw in govt_schemes_keywords) or any(kw in user_message for kw in govt_schemes_keywords):
+        return {
+            "intent": "govt_schemes",
+            "intent_confidence": 0.9,
+            "extracted_entities": {},
+            "current_query": user_message,
+            "detected_language": detected_lang,
+            "error": None,
+        }
+
+    free_audio_keywords = [
+        "free audio", "free music", "royalty free music", "royalty free audio",
+        "audio library", "free songs", "free mp3", "free bhakti songs",
+        "फ्री ऑडियो", "फ्री म्यूजिक", "रॉयल्टी फ्री", "फ्री गाने",
+    ]
+    if any(kw in user_lower for kw in free_audio_keywords) or any(kw in user_message for kw in free_audio_keywords):
+        return {
+            "intent": "free_audio_sources",
+            "intent_confidence": 0.9,
+            "extracted_entities": {},
+            "current_query": user_message,
+            "detected_language": detected_lang,
+            "error": None,
+        }
+
+    travel_plan_keywords = [
+        "road trip", "roadtrip", "car trip", "trip plan", "travel plan",
+        "route plan", "journey plan", "road trip plan", "car road trip",
+        "यात्रा", "यात्रा योजना", "ट्रिप", "ट्रिप प्लान", "रोड ट्रिप",
+        "कार ट्रिप", "यात्रा प्लान",
+    ]
+    if any(kw in user_lower for kw in travel_plan_keywords) or any(kw in user_message for kw in travel_plan_keywords):
+        if any(marker in user_lower for marker in [" from ", " to ", " se ", " tak "]) or any(marker in user_message for marker in [" से ", " तक "]):
+            return {
+                "intent": "chat",
+                "intent_confidence": 0.9,
+                "extracted_entities": {},
+                "current_query": user_message,
+                "detected_language": detected_lang,
+                "error": None,
+            }
 
     # Check for "near me" patterns (food should take priority over events)
     local_search_indicators = [
@@ -899,6 +1153,23 @@ async def detect_intent(state: BotState) -> dict:
             "intent": "events",
             "intent_confidence": 0.95,
             "extracted_entities": {"query": user_message},
+            "current_query": user_message,
+            "detected_language": detected_lang,
+            "error": None,
+        }
+
+    # Check for stock price patterns
+    stock_keywords = [
+        "stock price", "share price", "stock quote", "share quote", "stock rate",
+        "stock value", "share value", "stock today", "share today",
+        "portfolio", "stocks",
+        "शेयर भाव", "स्टॉक प्राइस", "शेयर प्राइस", "स्टॉक भाव",
+    ]
+    if any(kw in user_lower for kw in stock_keywords):
+        return {
+            "intent": "stock_price",
+            "intent_confidence": 0.9,
+            "extracted_entities": {"stock_name": user_message},
             "current_query": user_message,
             "detected_language": detected_lang,
             "error": None,
@@ -1725,6 +1996,7 @@ async def detect_intent(state: BotState) -> dict:
         valid_intents = [
             "local_search",
             "image",
+            "image_analysis",
             "pnr_status",
             "train_status",
             "metro_ticket",
@@ -1733,6 +2005,13 @@ async def detect_intent(state: BotState) -> dict:
             "db_query",
             "set_reminder",
             "get_news",
+            "stock_price",
+            "cricket_score",
+            "govt_jobs",
+            "govt_schemes",
+            "farmer_schemes",
+            "free_audio_sources",
+            "echallan",
             "fact_check",
             # Astrology intents
             "get_horoscope",
@@ -1755,11 +2034,30 @@ async def detect_intent(state: BotState) -> dict:
             "chat",
         ]
         intent = result.intent if result.intent in valid_intents else "chat"
+        phone = whatsapp_message.get("from_number", "")
+        if _is_image_followup_request(user_message):
+            cached = get_followup_context(phone) if phone else None
+            if cached and cached.get("last_intent") == "image_analysis":
+                return {
+                    "intent": "image_analysis",
+                    "intent_confidence": 0.9,
+                    "extracted_entities": {"use_last_image": True},
+                    "current_query": user_message,
+                    "detected_language": detected_lang,
+                    "error": None,
+                }
+        intent, confidence, entities = _maybe_use_recent_context(
+            phone=phone,
+            message=user_message,
+            intent=intent,
+            confidence=result.confidence,
+            entities=result.entities or {},
+        )
 
         return {
             "intent": intent,
-            "intent_confidence": result.confidence,
-            "extracted_entities": result.entities or {},
+            "intent_confidence": confidence,
+            "extracted_entities": entities or {},
             "current_query": user_message,
             "detected_language": detected_lang,
             "error": None,
@@ -1767,10 +2065,18 @@ async def detect_intent(state: BotState) -> dict:
 
     except Exception as e:
         # Fallback to chat on error
+        phone = whatsapp_message.get("from_number", "")
+        intent, confidence, entities = _maybe_use_recent_context(
+            phone=phone,
+            message=user_message,
+            intent="chat",
+            confidence=0.5,
+            entities={},
+        )
         return {
-            "intent": "chat",
-            "intent_confidence": 0.5,
-            "extracted_entities": {},
+            "intent": intent,
+            "intent_confidence": confidence,
+            "extracted_entities": entities or {},
             "current_query": user_message,
             "detected_language": detected_lang,
             "error": f"Intent detection error: {str(e)}",

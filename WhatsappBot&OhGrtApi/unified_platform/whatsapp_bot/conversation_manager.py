@@ -71,7 +71,7 @@ class ConversationManager:
     STRONG_INTENTS = [
         "get_horoscope", "birth_chart", "kundli_matching",
         "weather", "get_news", "pnr_status", "train_status",
-        "image", "local_search", "word_game", "tarot_reading",
+        "stock_price", "image", "local_search", "word_game", "tarot_reading",
     ]
 
     # Intents that may need context continuation

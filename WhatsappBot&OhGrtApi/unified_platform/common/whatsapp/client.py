@@ -88,28 +88,38 @@ class WhatsAppClient:
     async def send_image_message(
         self,
         to: str,
-        image_url: str,
+        image_url: Optional[str] = None,
+        image_id: Optional[str] = None,
         caption: Optional[str] = None,
         reply_to: Optional[str] = None,
     ) -> dict:
         """
-        Send an image message via URL.
+        Send an image message via URL or media ID.
 
         Args:
             to: Recipient phone number
-            image_url: Public URL of the image
+            image_url: Public URL of the image (optional)
+            image_id: WhatsApp media ID (optional, preferred for local uploads)
             caption: Optional caption (max 1024 characters)
             reply_to: Message ID to reply to (optional)
 
         Returns:
             API response dict
         """
+        image_payload = {}
+        if image_id:
+            image_payload["id"] = image_id
+        elif image_url:
+            image_payload["link"] = image_url
+        else:
+            raise ValueError("image_url or image_id is required")
+
         payload = {
             "messaging_product": "whatsapp",
             "recipient_type": "individual",
             "to": to,
             "type": "image",
-            "image": {"link": image_url},
+            "image": image_payload,
         }
 
         if caption:
@@ -210,34 +220,53 @@ class WhatsAppClient:
         """
         import asyncio
 
-        payload = {
-            "messaging_product": "whatsapp",
-            "recipient_type": "individual",
-            "to": to,
-            "status": "read",
-            "message_id": message_id,
-            "typing_indicator": {
-                "type": "text"
-            }
-        }
+        payloads = [
+            {
+                "messaging_product": "whatsapp",
+                "recipient_type": "individual",
+                "to": to,
+                "status": "read",
+                "message_id": message_id,
+                "typing_indicator": {"type": "text"},
+            },
+            {
+                "messaging_product": "whatsapp",
+                "recipient_type": "individual",
+                "to": to,
+                "type": "text",
+                "typing_indicator": {"type": "text"},
+            },
+        ]
 
         async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.post(
-                self.api_url,
-                headers=self._get_headers(),
-                json=payload,
-            )
+            last_result = {"status": "skipped", "reason": "no_attempts"}
+            for payload in payloads:
+                response = await client.post(
+                    self.api_url,
+                    headers=self._get_headers(),
+                    json=payload,
+                )
+                try:
+                    result = response.json()
+                except Exception:
+                    result = {"error": "non_json_response", "status_code": response.status_code}
 
-            result = response.json()
-            if response.status_code == 200:
-                logger.info("Typing indicator sent successfully")
-                # Hold typing for specified duration
-                if duration > 0:
-                    await asyncio.sleep(duration)
-            else:
-                logger.warning(f"Typing indicator error: {result}")
+                if response.status_code == 200 and not result.get("error"):
+                    logger.info("Typing indicator sent successfully")
+                    if duration > 0:
+                        await asyncio.sleep(duration)
+                    return result
 
-            return result
+                logger.warning(
+                    "Typing indicator error",
+                    extra={
+                        "status_code": response.status_code,
+                        "response": result,
+                    },
+                )
+                last_result = result
+
+            return last_result
 
     # async def send_typing_indicator(self, to: str) -> dict:
     #     """
@@ -488,6 +517,17 @@ class WhatsAppClient:
             Media ID or None if failed
         """
         upload_url = f"{WHATSAPP_API_URL}/{self.phone_number_id}/media"
+        filename_map = {
+            "audio/wav": "audio.wav",
+            "audio/ogg": "audio.ogg",
+            "audio/aac": "audio.aac",
+            "audio/mp4": "audio.mp4",
+            "image/jpeg": "image.jpg",
+            "image/jpg": "image.jpg",
+            "image/png": "image.png",
+            "image/webp": "image.webp",
+        }
+        filename = filename_map.get(mime_type, "audio.mp3")
 
         try:
             async with httpx.AsyncClient(timeout=60.0) as client:
@@ -495,7 +535,7 @@ class WhatsAppClient:
                     upload_url,
                     headers={"Authorization": f"Bearer {self.access_token}"},
                     data={"messaging_product": "whatsapp"},
-                    files={"file": ("audio.mp3", media_bytes, mime_type)},
+                    files={"file": (filename, media_bytes, mime_type)},
                 )
 
                 if response.status_code == 200:

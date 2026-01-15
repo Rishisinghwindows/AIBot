@@ -9,6 +9,7 @@ from whatsapp_bot.graph.nodes.astro import handle_horoscope
 from whatsapp_bot.graph.nodes.image import handle_image_generation
 from whatsapp_bot.graph.nodes.reminder import handle_reminder
 from whatsapp_bot.graph.nodes.help import handle_help
+from whatsapp_bot.graph.nodes.echallan import handle_echallan
 
 __all__ = [
     "handle_pnr_status",
@@ -18,4 +19,5 @@ __all__ = [
     "handle_image_generation",
     "handle_reminder",
     "handle_help",
+    "handle_echallan",
 ]

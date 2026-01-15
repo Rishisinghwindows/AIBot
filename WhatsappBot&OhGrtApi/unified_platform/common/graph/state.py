@@ -12,6 +12,7 @@ from operator import add
 IntentType = Literal[
     "local_search",
     "image",
+    "image_analysis",
     "pnr_status",
     "train_status",
     "metro_ticket",
@@ -20,6 +21,13 @@ IntentType = Literal[
     "db_query",
     "set_reminder",
     "get_news",
+    "stock_price",
+    "cricket_score",
+    "govt_jobs",
+    "govt_schemes",
+    "farmer_schemes",
+    "free_audio_sources",
+    "echallan",
     # Astrology intents
     "get_horoscope",
     "birth_chart",

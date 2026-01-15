@@ -23,6 +23,15 @@ INTENT = "local_search"
 # Response type for location request
 RESPONSE_TYPE_LOCATION_REQUEST = "location_request"
 
+def _build_maps_search_link(title: str, address: str = "") -> str:
+    """Create a Google Maps search link from place text."""
+    import urllib.parse
+
+    query = " ".join(part for part in [title.strip(), address.strip()] if part)
+    if not query:
+        return ""
+    return f"https://www.google.com/maps/search/?api=1&query={urllib.parse.quote(query)}"
+
 
 def _extract_location_from_query(query: str) -> tuple[str, str]:
     """
@@ -285,6 +294,8 @@ async def _execute_search_with_coordinates(
                     category = place.get("category", "")
                     distance_text = place.get("distance_text", "")
                     maps_link = place.get("maps_link", "")
+                    if not maps_link:
+                        maps_link = _build_maps_search_link(title, place_address)
 
                     response_lines.append(f"{i}. *{title}*")
                     if category:
@@ -377,6 +388,8 @@ async def _execute_search(query: str, display_query: str, lang: str = "en") -> d
                     category = place.get("category", "")
                     distance_text = place.get("distance_text", "")
                     maps_link = place.get("maps_link", "")
+                    if not maps_link:
+                        maps_link = _build_maps_search_link(title, address)
 
                     response_lines.append(f"{i}. *{title}*")
                     if category:
