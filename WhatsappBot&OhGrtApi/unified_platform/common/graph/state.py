@@ -15,6 +15,7 @@ IntentType = Literal[
     "image_analysis",
     "pnr_status",
     "train_status",
+    "train_journey",
     "metro_ticket",
     "weather",
     "word_game",

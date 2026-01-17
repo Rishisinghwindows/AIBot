@@ -32,7 +32,7 @@ class IntentClassification(BaseModel):
     """Structured output for intent classification."""
 
     intent: str = Field(
-        description="The classified intent: local_search, image, pnr_status, train_status, metro_ticket, weather, word_game, db_query, set_reminder, get_news, stock_price, cricket_score, govt_jobs, govt_schemes, farmer_schemes, free_audio_sources, echallan, fact_check, get_horoscope, birth_chart, kundli_matching, ask_astrologer, numerology, tarot_reading, life_prediction, dosha_check, get_panchang, get_remedy, find_muhurta, or chat"
+        description="The classified intent: local_search, image, pnr_status, train_status, train_journey, metro_ticket, weather, word_game, db_query, set_reminder, get_news, stock_price, cricket_score, govt_jobs, govt_schemes, farmer_schemes, free_audio_sources, echallan, fact_check, get_horoscope, birth_chart, kundli_matching, ask_astrologer, numerology, tarot_reading, life_prediction, dosha_check, get_panchang, get_remedy, find_muhurta, or chat"
     )
     confidence: float = Field(description="Confidence score between 0 and 1")
     entities: dict = Field(
@@ -78,6 +78,11 @@ Extract: "pnr" (10-digit number)
 Use for live train running status (train numbers like 12301, 22691).
 Examples: "train 12301 status", "where is rajdhani", "running status"
 Extract: "train_number", "date"
+
+**TRAVEL - Train Journey** - train_journey:
+Use for planning trains between two cities on a date.
+Examples: "plan a train journey from Bengaluru to Delhi on 26 January"
+Extract: "source_city", "destination_city", "journey_date"
 
 **TRAVEL - Metro** - metro_ticket:
 Use for metro routes, fares, information.
@@ -350,6 +355,15 @@ async def detect_intent(state: BotState) -> dict:
                 "intent": "train_status",
                 "intent_confidence": 0.9,
                 "extracted_entities": {"train_number": train_num},
+                "current_query": user_message,
+                "detected_language": detected_lang,
+                "error": None,
+            }
+        if " from " in user_lower and " to " in user_lower:
+            return {
+                "intent": "train_journey",
+                "intent_confidence": 0.85,
+                "extracted_entities": {},
                 "current_query": user_message,
                 "detected_language": detected_lang,
                 "error": None,
@@ -1403,6 +1417,7 @@ async def detect_intent(state: BotState) -> dict:
             "image",
             "pnr_status",
             "train_status",
+            "train_journey",
             "metro_ticket",
             "weather",
             "word_game",

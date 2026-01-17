@@ -15,6 +15,7 @@ from common.graph.nodes.intent import detect_intent
 from common.graph.nodes.chat import handle_chat, handle_fallback
 from common.graph.nodes.weather import handle_weather
 from common.graph.nodes.news import handle_news
+from common.graph.nodes.train_journey import handle_train_journey
 from common.graph.nodes.stock_price import handle_stock_price
 from common.config.settings import settings
 from common.i18n.detector import detect_language
@@ -341,6 +342,10 @@ class CommonChatProcessor:
         # Train Status
         elif intent == "train_status" and TRAIN_AVAILABLE:
             return await call_handler(handle_train_status, state)
+
+        # Train Journey planning
+        elif intent == "train_journey":
+            return await call_handler(handle_train_journey, state)
 
         # Image Generation
         elif intent == "image":

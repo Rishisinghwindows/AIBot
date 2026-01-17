@@ -70,6 +70,7 @@ INTENTS:
 - local_search: User wants to find places/restaurants/businesses
 - pnr_status: User wants PNR status (10-digit number)
 - train_status: User wants train running status
+- train_journey: User wants to plan a train journey between two cities on a date
 - metro_ticket: User wants metro info/fare
 - image: User wants AI image generation
 - word_game: User wants to play word game
@@ -96,6 +97,7 @@ ENTITY EXTRACTION RULES:
 - For local_search: Extract "search_query" and "location"
 - For pnr_status: Extract "pnr" (10-digit number)
 - For train_status: Extract "train_number"
+- For train_journey: Extract "source_city", "destination_city", and "journey_date" in English
 - For get_horoscope: Extract "astro_sign" and "astro_period"
 - For get_news: Extract "news_query" (MUST be in English, e.g., "बिहार की खबर" → "Bihar news") and "news_category"
   IMPORTANT: Always translate news topics to English for API calls:
@@ -194,7 +196,7 @@ RULES:
 1. Keep numbers, dates, times, and proper nouns (city names, app names) as-is
 2. Translate only the descriptive text
 3. Keep emojis and formatting (*, _, etc.)
-4. Be natural and conversational in the target language
+4. Be natural and conversational in the target language (sound human, not robotic)
 5. Keep units like °C, km, ₹ as-is
 
 Example (Hindi):

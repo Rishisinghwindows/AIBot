@@ -205,21 +205,35 @@ async def handle_horoscope(state: BotState) -> Dict:
         sign = HINDI_TO_ENGLISH[sign]
 
     if not sign:
-        # Ask for sign in user's language (fully localized)
-        ask_sign = get_horoscope_label("ask_sign", detected_lang)
-        example = get_horoscope_label("example", detected_lang)
+        user_lower = (query or "").lower()
+        wants_hinglish = "hinglish" in user_lower or "हिंग्लिश" in user_lower
+        if detected_lang == "hi" or wants_hinglish:
+            response = (
+                "Haan bhai, Hinglish mein baat kar sakta hoon 😊\n\n"
+                "Tumhara horoscope janna hai? Toh batao:\n\n"
+                "• Tumhara janam din (date of birth) kya hai? 📅\n"
+                "• Samay (time of birth) pata hai kya? ⏰\n"
+                "• Aur janam sthan (place of birth) kahan tha? 📍\n\n"
+                "In teen cheezon se main tumhara sahi horoscope bana sakta hoon. "
+                "Agar time nahi pata, toh approx (lagbhag) bata do, phir bhi kuch general bataya ja sakta hai.\n\n"
+                "Sun raha hoon... 🙏"
+            )
+        else:
+            # Ask for sign in user's language (fully localized)
+            ask_sign = get_horoscope_label("ask_sign", detected_lang)
+            example = get_horoscope_label("example", detected_lang)
 
-        # Build sign list in user's language
-        sign_names = []
-        for sign_key in list(ZODIAC_NAMES.keys())[:6]:  # Show first 6 signs
-            sign_names.append(get_zodiac_name(sign_key, detected_lang))
-        signs_list = ", ".join(sign_names) + ", ..."
+            # Build sign list in user's language
+            sign_names = []
+            for sign_key in list(ZODIAC_NAMES.keys())[:6]:  # Show first 6 signs
+                sign_names.append(get_zodiac_name(sign_key, detected_lang))
+            signs_list = ", ".join(sign_names) + ", ..."
 
-        response = (
-            f"*{ask_sign}*\n\n"
-            f"{signs_list}\n\n"
-            f"*{example}*"
-        )
+            response = (
+                f"*{ask_sign}*\n\n"
+                f"{signs_list}\n\n"
+                f"*{example}*"
+            )
 
         return {
             "response_text": response,

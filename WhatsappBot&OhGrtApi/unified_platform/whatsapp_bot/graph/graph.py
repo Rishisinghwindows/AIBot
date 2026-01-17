@@ -27,6 +27,7 @@ from whatsapp_bot.stores.pending_reminder_store import get_pending_reminder_stor
 # Import bot-specific nodes
 from whatsapp_bot.graph.nodes.pnr_status import handle_pnr_status
 from whatsapp_bot.graph.nodes.train_status import handle_train_status
+from whatsapp_bot.graph.nodes.train_journey import handle_train_journey
 from whatsapp_bot.graph.nodes.subscription import handle_subscription
 from whatsapp_bot.graph.nodes.astro import handle_horoscope
 from whatsapp_bot.graph.nodes.image import handle_image_generation
@@ -346,6 +347,7 @@ def route_by_intent(state: BotState) -> str:
         # Travel
         "pnr_status": "pnr_status",
         "train_status": "train_status",
+        "train_journey": "train_journey",
         "metro_ticket": "metro_ticket" if METRO_AVAILABLE else "chat",
         # Astrology
         "get_horoscope": "get_horoscope",
@@ -414,6 +416,7 @@ def create_graph() -> StateGraph:
     graph.add_node("stock_price", handle_stock_price)
     graph.add_node("pnr_status", handle_pnr_status)
     graph.add_node("train_status", handle_train_status)
+    graph.add_node("train_journey", handle_train_journey)
     graph.add_node("get_horoscope", handle_horoscope)
     graph.add_node("subscription", handle_subscription)
     graph.add_node("image_gen", handle_image_generation)
@@ -473,6 +476,7 @@ def create_graph() -> StateGraph:
     routing_map = {
         "pnr_status": "pnr_status",
         "train_status": "train_status",
+        "train_journey": "train_journey",
         "get_horoscope": "get_horoscope",
         "subscription": "subscription",
         "weather": "weather",
@@ -533,6 +537,7 @@ def create_graph() -> StateGraph:
         "echallan",
         "pnr_status",
         "train_status",
+        "train_journey",
         "get_horoscope",
         "subscription",
         "image_gen",

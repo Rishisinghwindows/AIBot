@@ -70,7 +70,7 @@ class ConversationManager:
     # Strong intents that ALWAYS create new context (override existing)
     STRONG_INTENTS = [
         "get_horoscope", "birth_chart", "kundli_matching",
-        "weather", "get_news", "pnr_status", "train_status",
+        "weather", "get_news", "pnr_status", "train_status", "train_journey",
         "stock_price", "image", "local_search", "word_game", "tarot_reading",
     ]
 

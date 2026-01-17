@@ -10,6 +10,7 @@ from common.graph.nodes.local_search import handle_local_search
 from common.graph.nodes.image_gen import handle_image_generation
 from common.graph.nodes.pnr_status import handle_pnr_status
 from common.graph.nodes.train_status import handle_train_status
+from common.graph.nodes.train_journey import handle_train_journey
 from common.graph.nodes.metro_ticket import handle_metro_ticket
 from common.graph.nodes.cricket_score import handle_cricket_score
 from common.graph.nodes.govt_jobs import handle_govt_jobs
@@ -26,6 +27,7 @@ __all__ = [
     "handle_image_generation",
     "handle_pnr_status",
     "handle_train_status",
+    "handle_train_journey",
     "handle_metro_ticket",
     "handle_cricket_score",
     "handle_govt_jobs",

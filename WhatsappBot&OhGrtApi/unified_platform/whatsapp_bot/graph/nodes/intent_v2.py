@@ -49,9 +49,24 @@ CONTEXT_HINTS = [
 GREETING_ONLY = {"hi", "hello", "hey", "namaste", "hola"}
 
 
+def _is_smalltalk(message: str) -> bool:
+    msg = (message or "").strip().lower()
+    smalltalk_phrases = [
+        "how are you", "how r u", "how ru", "what's up", "whats up",
+        "what are you doing", "what r you doing", "wru doing",
+        "good morning", "good afternoon", "good evening", "good night",
+        "sup", "yo", "hey there",
+        "kaise ho", "kaisi ho", "kaisa hai", "kya kar rahe ho", "kya kar rahe",
+        "kya chal raha", "aur batao", "kaise chal raha", "kaise chal rha",
+    ]
+    return any(phrase in msg for phrase in smalltalk_phrases)
+
+
 def _should_reuse_context(message: str) -> bool:
     msg = (message or "").strip().lower()
     if not msg or msg in GREETING_ONLY:
+        return False
+    if _is_smalltalk(msg):
         return False
     if len(msg.split()) <= 4:
         return True
@@ -95,7 +110,7 @@ class IntentClassification(BaseModel):
     """Structured output for intent classification."""
 
     intent: str = Field(
-        description="The classified intent: local_search, image, pnr_status, train_status, metro_ticket, weather, word_game, db_query, set_reminder, get_news, stock_price, cricket_score, govt_jobs, govt_schemes, farmer_schemes, free_audio_sources, echallan, fact_check, get_horoscope, birth_chart, kundli_matching, ask_astrologer, numerology, tarot_reading, life_prediction, dosha_check, get_panchang, get_remedy, find_muhurta, or chat"
+        description="The classified intent: local_search, image, image_analysis, pnr_status, train_status, train_journey, metro_ticket, weather, word_game, db_query, set_reminder, get_news, stock_price, cricket_score, govt_jobs, govt_schemes, farmer_schemes, free_audio_sources, echallan, fact_check, get_horoscope, birth_chart, kundli_matching, ask_astrologer, numerology, tarot_reading, life_prediction, dosha_check, get_panchang, get_remedy, find_muhurta, or chat"
     )
     confidence: float = Field(description="Confidence score between 0 and 1")
     entities: dict = Field(
@@ -133,6 +148,10 @@ Classify the user message into one of these intents:
   Examples: "check pnr 1234567890", "pnr status 9876543210", "what is my pnr 1111111111"
 - train_status: User wants live running status of a train (look for train numbers like 12301, 22691)
   Examples: "train 12301 status", "where is train 22691", "running status of rajdhani"
+- train_journey: User wants to plan a train journey between two cities on a date
+  Examples: "plan a train journey from Bengaluru to Delhi on 26 January", "trains from Mumbai to Pune"
+- train_journey: User wants to plan a train journey between two cities on a date
+  Examples: "plan a train journey from Bengaluru to Delhi on 26 January", "trains from Mumbai to Pune"
 - metro_ticket: User wants metro information, fare, or route help (Delhi Metro, Bangalore Metro, etc.)
   Examples: "metro from dwarka to rajiv chowk", "metro fare", "how to reach nehru place by metro"
 - weather: User wants to know the current weather conditions for a specific city.
@@ -184,6 +203,8 @@ ASTROLOGY INTENTS (AstroTalk-like features):
 Extract relevant entities based on intent:
 - For pnr_status: Extract the 10-digit PNR number as "pnr"
 - For train_status: Extract train number as "train_number" and optional date as "date"
+- For train_journey: Extract "source_city", "destination_city", and "journey_date"
+- For train_journey: Extract "source_city", "destination_city", and "journey_date"
 - For local_search: Extract search query as "search_query" and location as "location"
   IMPORTANT: "near me", "nearby", "nearest", "around me", "close to me" are NOT locations - leave location empty for these. Only extract actual place names like "Delhi", "Connaught Place", "BTM Layout" as location.
 - For image: Extract the image description as "image_prompt"
@@ -565,6 +586,27 @@ async def detect_intent(state: BotState) -> dict:
     if any(kw in user_lower for kw in echallan_keywords):
         return {
             "intent": "echallan",
+            "intent_confidence": 0.9,
+            "extracted_entities": {},
+            "current_query": user_message,
+            "detected_language": detected_lang,
+            "error": None,
+        }
+
+    # Check for train journey planning (from/to + optional date)
+    journey_keywords = [
+        "train journey", "plan train", "train from", "trains from", "train to",
+        "book train", "railway from", "railway to",
+        "यात्रा", "ट्रेन यात्रा", "ट्रेन से", "ट्रेन टिकट",
+        "यात्रा योजना", "यात्रा प्लान",
+    ]
+    has_route_markers = (
+        " from " in user_lower
+        and " to " in user_lower
+    ) or (" से " in user_message and " तक " in user_message)
+    if any(kw in user_lower for kw in journey_keywords) and has_route_markers:
+        return {
+            "intent": "train_journey",
             "intent_confidence": 0.9,
             "extracted_entities": {},
             "current_query": user_message,
@@ -1999,6 +2041,7 @@ async def detect_intent(state: BotState) -> dict:
             "image_analysis",
             "pnr_status",
             "train_status",
+            "train_journey",
             "metro_ticket",
             "weather",
             "word_game",

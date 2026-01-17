@@ -52,6 +52,7 @@ from whatsapp_bot.graphs.astro_graph import get_astro_graph
 # Travel handlers
 from whatsapp_bot.graph.nodes.pnr_status import handle_pnr_status
 from whatsapp_bot.graph.nodes.train_status import handle_train_status
+from whatsapp_bot.graph.nodes.train_journey import handle_train_journey
 from whatsapp_bot.graph.nodes.metro_ticket import handle_metro_ticket
 
 # Utility handlers
@@ -112,6 +113,8 @@ def route_travel(state: BotState) -> dict:
 
     if "pnr" in query:
         return {"travel_intent": "pnr_status"}
+    elif "from" in query and "to" in query:
+        return {"travel_intent": "train_journey"}
     elif "train" in query or "running status" in query:
         return {"travel_intent": "train_status"}
     elif "metro" in query:
@@ -126,6 +129,7 @@ def select_travel_handler(state: BotState) -> str:
     return {
         "pnr_status": "pnr_status",
         "train_status": "train_status",
+        "train_journey": "train_journey",
         "metro_ticket": "metro_ticket",
     }.get(travel_intent, "train_status")
 
@@ -273,6 +277,7 @@ def create_graph_v2() -> StateGraph:
     graph.add_node("travel_router", route_travel)
     graph.add_node("pnr_status", handle_pnr_status)
     graph.add_node("train_status", handle_train_status)
+    graph.add_node("train_journey", handle_train_journey)
     graph.add_node("metro_ticket", handle_metro_ticket)
 
     # =========================================================================
@@ -333,6 +338,7 @@ def create_graph_v2() -> StateGraph:
         {
             "pnr_status": "pnr_status",
             "train_status": "train_status",
+            "train_journey": "train_journey",
             "metro_ticket": "metro_ticket",
         }
     )
@@ -354,7 +360,7 @@ def create_graph_v2() -> StateGraph:
 
     # All terminal handlers -> Check fallback -> End
     terminal_nodes = [
-        "pnr_status", "train_status", "metro_ticket",
+        "pnr_status", "train_status", "train_journey", "metro_ticket",
         "weather", "stock_price", "news", "image_gen", "reminder", "local_search", "db_query",
         "game", "chat"
     ]
